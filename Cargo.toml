@@ -1,0 +1,7 @@
+[package]
+authors = ["Song Jaehak <jaehak@hpi.cc>"]
+name = "semi-c"
+version = "0.1.0"
+
+[dependencies]
+lalrpop = "0.13.1"
