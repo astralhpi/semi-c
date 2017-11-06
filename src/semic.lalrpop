@@ -1,0 +1,29 @@
+use std::str::FromStr;
+use ast;
+
+grammar;
+
+extern {
+    type Location = usize;
+}
+
+pub Id:String = {
+    <l: @L> <s:r"[a-zA-Z][a-zA-Z0-9_]*"> <r:@R> =>
+        s.to_string()
+};
+pub Intcon: i32 = r"\d+" => i32::from_str(<>).unwrap();
+pub Charcon: char = {
+    <c:r"'[\P{Cc}]'">  => c[1..].chars().next().unwrap(),
+    <c:r"'\\n'"> => '\n',
+    <c:r"'\\0'"> => '\0'
+};
+pub Stringcon: String = r#""[\P{Cc}\n]*""# => <>[1..<>.len()-1].to_string();
+pub Comments: String = r"/\*.*\*/" => <>.to_string();
+
+//pub LogicalOp: ast::LogicalOp = {
+//    r"&&" => ast::LogicalOp::And,
+//    r"\|\|" => ast::LogicalOp::Or,
+//};
+
+
+// vim: ft=rust
