@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use ast;
+use ast::{Span};
 use ast_utils::*;
 
 grammar;
@@ -12,6 +13,21 @@ pub Id: ast::Id = {
     <l:@L> <s:r"[a-zA-Z][a-zA-Z0-9_]*"> <r:@R> =>
         ast::Id::new(l, r, s.to_string())
 };
+
+pub Lit: ast::Lit = {
+    <l:@L> <s:r"\d+"> <r:@R> =>
+        create_lit_int(l, r, i32::from_str(s).unwrap()),
+    <l:@L> <c:r"'[\P{Cc}]'"> <r:@R> =>
+        create_lit_char(l, r, c[1..].chars().next().unwrap()),
+    <l:@L> <c:r"'\\n'"> <r:@R> =>
+        create_lit_char(l, r, '\n'),
+    <l:@L> <c:r"'\\0'"> <r:@R> =>
+        create_lit_char(l, r, '\0'),
+    <l:@L> <s:r#""[\P{Cc}\n]*""#> <r:@R> =>
+        create_lit_string(l, r, s[1..s.len()-1].to_string())
+
+};
+
 pub Intcon: ast::Lit = {
     <l:@L> <s:r"\d+"> <r:@R> => create_lit_int(l, r, i32::from_str(s).unwrap())
 };
@@ -29,5 +45,13 @@ pub Stringcon: ast::Lit = {
     <l:@L> <s:r#""[\P{Cc}\n]*""#> <r:@R> =>
         create_lit_string(l, r, s[1..s.len()-1].to_string())
 };
+
+//pub Expr: ast::Expr = {
+//    <l:@L> Lit <r:@R> => Expr {
+//        span: Span::new(l, r),
+//        node: ast::ExprKind
+//
+//    }
+//}
 
 // vim: ft=rust

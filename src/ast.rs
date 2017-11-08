@@ -4,6 +4,15 @@ pub struct Span {
     pub hi: usize,
 }
 
+impl Span {
+    pub fn new(lo:usize, hi:usize) -> Span {
+        Span {
+            lo,
+            hi
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Spanned<T> {
     pub span: Span,
