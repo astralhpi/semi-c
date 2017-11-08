@@ -44,6 +44,16 @@ fn id() {
         "asdf")
 }
 
+#[test]
+fn expr() {
+    assert_eq!(
+        semic::parse_Expr("(123)").unwrap().node,
+        ExprKind::Paren(Box::new(Expr {
+            span: Span::new(1, 4),
+            node: ExprKind::Lit(Box::new(Lit::new(1, 4, LitKind::Int(123))))
+        })));
+}
+
 //#[test]
 //fn basic_op() {
 //    assert_eq!(semic::parse_Expr("10"), ast::Expr {

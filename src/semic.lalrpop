@@ -46,12 +46,83 @@ pub Stringcon: ast::Lit = {
         create_lit_string(l, r, s[1..s.len()-1].to_string())
 };
 
-//pub Expr: ast::Expr = {
-//    <l:@L> Lit <r:@R> => Expr {
-//        span: Span::new(l, r),
-//        node: ast::ExprKind
-//
-//    }
-//}
+pub Expr: ast::Expr = {
+    OrExpr => <>
+};
+
+pub OrExpr: ast::Expr = {
+    <l:@L> <left:Equal> <l2:@L> "||" <r2:@R> <right:Equal> <r:@R> => 
+        create_expr_binary(l, r, l2, r2, ast::BinOpKind::Or, left, right),
+    AndExpr => <>
+};
+
+pub AndExpr: ast::Expr = {
+    <l:@L> <left:Equal> <l2:@L> "&&" <r2:@R> <right:Equal> <r:@R> => 
+        create_expr_binary(l, r, l2, r2, ast::BinOpKind::And, left, right),
+    Equal => <>
+};
+
+pub Equal: ast::Expr = {
+    <l:@L> <left:Comparison> <l2:@L> "==" <r2:@R> <right:Comparison> <r:@R> => 
+        create_expr_binary(l, r, l2, r2, ast::BinOpKind::Eq, left, right),
+    <l:@L> <left:Comparison> <l2:@L> "!=" <r2:@R> <right:Comparison> <r:@R> => 
+        create_expr_binary(l, r, l2, r2, ast::BinOpKind::Ne, left, right),
+    Comparison  => <>
+};
+
+
+pub Comparison: ast::Expr = {
+    <l:@L> <left:AddSub> <l2:@L> "<" <r2:@R> <right:AddSub> <r:@R> => 
+        create_expr_binary(l, r, l2, r2, ast::BinOpKind::Lt, left, right),
+    <l:@L> <left:AddSub> <l2:@L> "<=" <r2:@R> <right:AddSub> <r:@R> => 
+        create_expr_binary(l, r, l2, r2, ast::BinOpKind::Le, left, right),
+    <l:@L> <left:AddSub> <l2:@L> ">" <r2:@R> <right:AddSub> <r:@R> =>
+        create_expr_binary(l, r, l2, r2, ast::BinOpKind::Gt, left, right),
+    <l:@L> <left:AddSub> <l2:@L> ">=" <r2:@R> <right:AddSub> <r:@R>=>
+        create_expr_binary(l, r, l2, r2, ast::BinOpKind::Ge, left, right),
+    AddSub => <>
+};
+
+
+pub AddSub: ast::Expr = {
+    <l:@L> <left:Factor> <l2:@L> "+" <r2:@R> <right:Factor> <r:@R>=> 
+        create_expr_binary(l, r, l2, r2, ast::BinOpKind::Add, left, right),
+    <l:@L> <left:Factor> <l2:@L> "-" <r2:@R> <right:Factor> <r:@R>=> 
+        create_expr_binary(l, r, l2, r2, ast::BinOpKind::Sub, left, right),
+    Factor => <>
+};
+
+pub Factor: ast::Expr = {
+    <l:@L> <left:Unary> <l2:@L> "*" <r2:@R> <right:Unary> <r:@R>=> 
+        create_expr_binary(l, r, l2, r2, ast::BinOpKind::Mul, left, right),
+    <l:@L> <left:Unary> <l2:@L> "/" <r2:@R> <right:Unary> <r:@R>=>
+        create_expr_binary(l, r, l2, r2, ast::BinOpKind::Div, left, right),
+    Unary => <>
+};
+
+pub Unary: ast::Expr = {
+    <l:@L> "-" <e:Term> <r:@R> => ast::Expr {
+        span: Span::new(l, r),
+        node: ast::ExprKind::Minus(Box::new(e))
+    },
+    <l:@L> "!" <e:Term> <r:@R> => ast::Expr {
+        span: Span::new(l, r),
+        node: ast::ExprKind::Not(Box::new(e))
+    },
+    Term => <>
+};
+
+pub Term: ast::Expr = {
+    <l:@L> "(" <e:Expr> ")" <r:@R> => ast::Expr {
+        span: Span::new(l, r),
+        node: ast::ExprKind::Paren(Box::new(e))
+    },
+    <l:@L> <lit:Lit> <r:@R> => ast::Expr {
+        span: Span::new(l, r),
+        node: ast::ExprKind::Lit(Box::new(lit))
+    }
+
+};
+
 
 // vim: ft=rust
