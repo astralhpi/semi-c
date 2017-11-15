@@ -120,9 +120,28 @@ pub Term: ast::Expr = {
     <l:@L> <lit:Lit> <r:@R> => ast::Expr {
         span: Span::new(l, r),
         node: ast::ExprKind::Lit(Box::new(lit))
-    }
+    },
+    <l:@L> <id:Id> <r:@R> => create_expr_id(l, r, id),
+    <l:@L> <id:Id> "[" <e:Expr> "]" <r:@R> => ast::Expr {
+        span: Span::new(l, r),
+        node: ast::ExprKind::Index(id, Box::new(e))
+    },
+    <l:@L> <id:Id> "(" <args:Comma<Expr>> ")" <r:@R> => ast::Expr {
+        span: Span::new(l, r),
+        node: ast::ExprKind::Call(id, args)
+    } 
 
 };
 
+Comma<T>: Vec<T> = {
+    <v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            let mut v = v;
+            v.push(e);
+            v
+        }
+    }
+};
 
 // vim: ft=rust

@@ -71,6 +71,7 @@ pub enum ExprKind {
     Minus(Box<Expr>),
     Not(Box<Expr>),
     Binary(BinOp, Box<Expr>, Box<Expr>),
+    Id(Id),
     Call(Id, Vec<Expr>),
     Index(Id, Box<Expr>),
     Paren(Box<Expr>),

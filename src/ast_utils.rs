@@ -22,3 +22,10 @@ pub fn create_expr_binary(
             Box::new(left), Box::new(right))
     }
 }
+
+pub fn create_expr_id(l:usize, r:usize, id:Id) -> Expr {
+    Expr {
+        span: Span::new(l, r),
+        node: ExprKind::Id(id)
+    }
+}

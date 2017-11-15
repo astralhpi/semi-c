@@ -52,25 +52,42 @@ fn expr() {
             span: Span::new(1, 4),
             node: ExprKind::Lit(Box::new(Lit::new(1, 4, LitKind::Int(123))))
         })));
-}
+    match semic::parse_Expr("1+2*3 == 3").unwrap().node {
+        ExprKind::Binary(op, _left, _right) => {
+            assert_eq!(op.node, BinOpKind::Eq);
+        },
+        _ => assert!(false)
+    };
+    match semic::parse_Expr("a").unwrap().node {
+        ExprKind::Id(id) => {
+            assert_eq!(id.node, "a");
+        },
+        _ => assert!(false)
+    };
 
-//#[test]
-//fn basic_op() {
-//    assert_eq!(semic::parse_Expr("10"), ast::Expr {
-//        span: ast::Span {
-//            lo: 0,
-//            hi: 1,
-//        },
-//        node: ast::ExprKind::Lit(Box::new(ast::Spanned {
-//            span: ast::Span {
-//                lo: 0,
-//                hi: 1,
-//            },
-//            node: ast::LitKind::Int(10)
-//        }
-//    ))});
-//
-//}
+    match semic::parse_Expr("a*b == c").unwrap().node {
+        ExprKind::Binary(op, _left, _right) => {
+            assert_eq!(op.node, BinOpKind::Eq);
+        },
+        _ => assert!(false)
+    };
+
+    match semic::parse_Expr("a[1+2]").unwrap().node {
+        ExprKind::Index(id, expr) => {
+            assert_eq!(id.node, "a");
+        },
+        _ => assert!(false)
+    };
+
+    match semic::parse_Expr("a(1, 2)").unwrap().node {
+        ExprKind::Call(id, args) => {
+            assert_eq!(id.node, "a");
+        },
+        _ => assert!(false)
+    };
+
+
+}
 
 fn main() {
     match semic::parse_Id("  \nasdf") {
