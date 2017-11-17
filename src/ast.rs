@@ -125,6 +125,7 @@ pub type ParamTypes = Spanned<ParamTypesKind>;
 pub enum TypeKind {
     Char,
     Int,
+    Float,
     Pointer(Box<TypeKind>),
     Array(Box<TypeKind>, Option<i32>)
 }

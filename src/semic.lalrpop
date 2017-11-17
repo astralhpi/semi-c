@@ -3,7 +3,7 @@ use ast;
 use ast::{Span};
 use ast_utils::*;
 
-grammar;
+#[LALR] grammar;
 
 extern {
     type Location = usize;
@@ -50,6 +50,10 @@ pub Type: ast::Type = {
     <l:@L> "int" <r:@R> => ast::Type {
         span: Span::new(l, r),
         node: ast::TypeKind::Int
+    },
+    <l:@L> "float" <r:@R> => ast::Type {
+        span: Span::new(l, r),
+        node: ast::TypeKind::Float
     },
     <l:@L> "char" <r:@R> => ast::Type {
         span: Span::new(l, r),
@@ -117,8 +121,7 @@ pub Prog: ast::Program = {
     }
 };
 pub GlobalDcl: ast::GlobalDclKind = {
-    <func:Func> => func
-
+    <func:Func> => func,
 };
 
 pub VarDelc: ast::VarDelc = {
@@ -199,7 +202,7 @@ pub Stmt: ast::Stmt = {
         span: Span::new(l, r),
         node: ast::StmtKind::Empty
     },
-    <l:@L>"{" <s:SemiColon<Stmt>> "}" <r:@R> => ast::Stmt {
+    <l:@L>"{" <s:Multi<Stmt>> "}" <r:@R> => ast::Stmt {
         span: Span::new(l, r),
         node: ast::StmtKind::Block(s)
     },
@@ -333,13 +336,10 @@ pub Term: ast::Expr = {
 };
 
 CommaPlus<T>: Vec<T> = {
-    <v:(<T> ",")+> <e:T?> => match e {
-        None => v,
-        Some(e) => {
-            let mut v = v;
-            v.push(e);
-            v
-        }
+    <v:(<T> ",")*> <e:T> => {
+        let mut v = v;
+        v.push(e);
+        v
     }
 };
 
@@ -366,18 +366,16 @@ SemiColon<T>: Vec<T> = {
 };
 
 Optional<T>: Option<Box<T>> = {
-    "" => Option::None,
+    => Option::None,
     <e:T> => Option::Some(Box::new(e))
 };
 
 Multi<T>: Vec<T> = {
-    <v:(<T> "")*> <e:T?> => match e {
-        None => v,
-        Some(e) => {
-            let mut v = v;
-            v.push(e);
-            v
-        }
+    => vec![],
+    <v:Multi<T>> <e:T> => {
+        let mut v = v;
+        v.push(e);
+        v
     }
 };
 
