@@ -86,6 +86,12 @@ fn expr() {
         _ => assert!(false)
     };
 
+    match semic::parse_Expr("a()").unwrap().node {
+        ExprKind::Call(id, args) => {
+            assert_eq!(id.node, "a");
+        },
+        _ => assert!(false)
+    };
 
 }
 

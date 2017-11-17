@@ -46,6 +46,205 @@ pub Stringcon: ast::Lit = {
         create_lit_string(l, r, s[1..s.len()-1].to_string())
 };
 
+pub Type: ast::Type = {
+    <l:@L> "int" <r:@R> => ast::Type {
+        span: Span::new(l, r),
+        node: ast::TypeKind::Int
+    },
+    <l:@L> "char" <r:@R> => ast::Type {
+        span: Span::new(l, r),
+        node: ast::TypeKind::Char
+    },
+    <l:@L> <t:Type> "*" <r:@R> => ast::Type {
+        span: Span::new(l, r),
+        node: ast::TypeKind::Pointer(Box::new(t.node))
+    }
+
+};
+
+pub ParamType: (ast::Type, ast::Id) = {
+    <l:@L> <t:Type> <id:Id> <r:@R> => (t, id),
+    <l:@L> <t:Type> <id:Id> "[" "]" <r:@R> => {
+        (ast::Type{
+            span: Span::new(l, r),
+            node: ast::TypeKind::Array(Box::new(t.node), Option::None)
+        }, id)
+    }
+};
+
+pub ParamTypes: ast::ParamTypes = {
+    <l:@L> "void" <r:@R> => ast::ParamTypes {
+        span: Span::new(l, r),
+        node: ast::ParamTypesKind::Void
+    },
+    <l:@L> <t:Comma<ParamType>> <r:@R> => ast::ParamTypes {
+        span: Span::new(l, r),
+        node: ast::ParamTypesKind::Params(t)
+    },
+};
+
+pub ReturnType: ast::ReturnType = {
+    <l:@L> "void" <r:@R> => ast::ReturnType {
+        span: Span::new(l, r),
+        node: ast::ReturnTypeKind::Void
+    },
+    <l:@L> <t:Type> <r:@R> => ast::ReturnType {
+        span: Span::new(l, r),
+        node: ast::ReturnTypeKind::Type(t.node)
+    }
+};
+
+pub Func: ast::GlobalDclKind = {
+    <fl:@L> <t:ReturnType> <id:Id> "(" <p:ParamTypes> ")" <fr:@R>
+    <bl:@L> "{" <delc:Multi<VarDelc>> <stmt:Multi<Stmt>>  "}" <br:@R>  =>{
+        ast::GlobalDclKind::Func(ast::FuncDelc{
+            span: Span::new(fl, fr),
+            return_type: t,
+            id: id,
+            param_types: p
+        },
+        ast::FuncBody{
+            span: Span::new(bl, br),
+            var_decls: delc,
+            stmt: stmt
+        })
+    }
+};
+pub Prog: ast::Program = {
+    <l:@L> <dcl:Multi<GlobalDcl>> <r:@R> => ast::Program {
+        span: Span::new(l, r),
+        declines: dcl
+    }
+};
+pub GlobalDcl: ast::GlobalDclKind = {
+    <func:Func> => func
+
+};
+
+pub VarDelc: ast::VarDelc = {
+    <l:@L> <t:Type> <v:CommaPlus<VarName>> ";" <r:@R> => {
+        let mut names: Vec<(ast::Type, ast::Id)> = vec![];
+
+        for item in v {
+            match item.node {
+                ast::VarNameKind::Single(id) => {
+                    names.push((t.clone(), id));
+                },
+                ast::VarNameKind::Array(id, size) => {
+                    names.push((ast::Type{
+                        span: t.span.clone(),
+                        node: ast::TypeKind::Array(
+                            Box::new(t.node.clone()), Option::Some(size))
+                    }, id));
+                }
+            }
+        }
+
+        ast::VarDelc {
+            span: Span::new(l, r),
+            names: names
+        }
+    }
+
+};
+
+
+pub VarName: ast::VarName = {
+    <l:@L> <id:Id> <r:@R> => ast::VarName {
+        span: Span::new(l, r),
+        node: ast::VarNameKind::Single(id)
+    },
+    <l:@L> <id:Id> "[" <i:Intcon> "]" <r:@R> => {
+        match i.node {
+            ast::LitKind::Int(i) => 
+                ast::VarName {
+                    span: Span::new(l, r),
+                    node: ast::VarNameKind::Array(id, i)
+                },
+            _ => panic!("error")
+        }
+
+    }
+};
+
+
+pub Stmt: ast::Stmt = {
+    <matched:Matched> => matched,
+    <unmatched:Unmatched> => unmatched,
+    <l:@L> "while" "(" <expr:Expr> ")" <stmt:Stmt> <r:@R> => ast::Stmt {
+        span: Span::new(l, r),
+        node: ast::StmtKind::While(Box::new(expr), Box::new(stmt))
+    },
+    <l:@L> "for" "("
+        <init:Optional<Assg>> ";"
+        <check:Optional<Expr>> ";"
+        <inc:Optional<Assg>>
+        ")" <stmt:Stmt> <r:@R> => ast::Stmt {
+            span: Span::new(l, r),
+            node: ast::StmtKind::For(init, check, inc, Box::new(stmt))
+        },
+    <l:@L> "return" <stmt:Optional<Expr>> ";" <r:@R> => ast::Stmt {
+        span: Span::new(l, r),
+        node: ast::StmtKind::Return(stmt)
+    },
+    <l:@L> <assg:Assg> ";" <r:@R> => ast::Stmt {
+        span: Span::new(l, r),
+        node: ast::StmtKind::Assign(Box::new(assg))
+    },
+    <l:@L> <id:Id> "(" <args:Comma<Expr>>  ")" ";" <r:@R> => ast::Stmt {
+        span: Span::new(l, r),
+        node: ast::StmtKind::Call(id, args)
+    },
+    <l:@L> ";" <r:@R> => ast::Stmt {
+        span: Span::new(l, r),
+        node: ast::StmtKind::Empty
+    },
+    <l:@L>"{" <s:SemiColon<Stmt>> "}" <r:@R> => ast::Stmt {
+        span: Span::new(l, r),
+        node: ast::StmtKind::Block(s)
+    },
+};
+
+pub Matched: ast::Stmt = {
+    <l:@L> "if" "(" <expr:Expr> ")" <stmt:Matched> "else" <stmt2:Matched> <r:@R> => {
+        ast::Stmt {
+            span: Span::new(l, r),
+            node: ast::StmtKind::If(
+                Box::new(expr),
+                Box::new(stmt),
+                Option::Some(Box::new(stmt2)))
+        }
+    }
+};
+
+pub Unmatched: ast::Stmt = {
+    <l:@L> "if" "(" <expr:Expr> ")" <stmt:Stmt> <r:@R> => ast::Stmt {
+        span: Span::new(l, r),
+        node: ast::StmtKind::If(Box::new(expr), Box::new(stmt), Option::None)
+    },
+    <l:@L> "if" "(" <expr:Expr> ")" <stmt:Matched> "else" <stmt2:Unmatched> <r:@R> => {
+        ast::Stmt {
+            span: Span::new(l, r),
+            node: ast::StmtKind::If(
+                Box::new(expr),
+                Box::new(stmt),
+                Option::Some(Box::new(stmt2)))
+        }
+    }
+};
+
+pub Assg: ast::Assg = {
+    <l:@L> <id:Id> "=" <expr:Expr> <r:@R> => ast::Assg {
+        span: Span::new(l, r),
+        node: ast::AssgKind::Assign(id, Option::None, Box::new(expr))
+    },
+    <l:@L> <id:Id> "[" <expr1:Expr> "]" "=" <expr2:Expr> <r:@R> => ast::Assg {
+        span: Span::new(l, r),
+        node: ast::AssgKind::Assign(
+            id, Option::Some(Box::new(expr1)), Box::new(expr2))
+    },
+};
+
 pub Expr: ast::Expr = {
     OrExpr => <>
 };
@@ -133,8 +332,46 @@ pub Term: ast::Expr = {
 
 };
 
+CommaPlus<T>: Vec<T> = {
+    <v:(<T> ",")+> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            let mut v = v;
+            v.push(e);
+            v
+        }
+    }
+};
+
 Comma<T>: Vec<T> = {
     <v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            let mut v = v;
+            v.push(e);
+            v
+        }
+    }
+};
+
+SemiColon<T>: Vec<T> = {
+    <v:(<T> ";")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            let mut v = v;
+            v.push(e);
+            v
+        }
+    }
+};
+
+Optional<T>: Option<Box<T>> = {
+    "" => Option::None,
+    <e:T> => Option::Some(Box::new(e))
+};
+
+Multi<T>: Vec<T> = {
+    <v:(<T> "")*> <e:T?> => match e {
         None => v,
         Some(e) => {
             let mut v = v;

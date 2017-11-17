@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Span {
     pub lo: usize,
     pub hi: usize,
@@ -13,7 +13,7 @@ impl Span {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Spanned<T> {
     pub span: Span,
     pub node: T,
@@ -103,12 +103,12 @@ pub enum StmtKind {
     // while(expr) stmt
     While(Box<Expr>, Box<Stmt>),
     // for(assg;expr;assg) stmt
-    For(Box<Assg>, Box<Expr>, Box<Assg>, Box<Stmt>),
+    For(Option<Box<Assg>>, Option<Box<Expr>>, Option<Box<Assg>>, Box<Stmt>),
     // return expr
     Return(Option<Box<Expr>>),
     Assign(Box<Assg>),
     Call(Id, Vec<Expr>),
-    Block(Box<Stmt>),
+    Block(Vec<Stmt>),
     Empty,
 }
 
@@ -116,18 +116,20 @@ pub enum StmtKind {
 #[derive(Debug, PartialEq)]
 pub enum ParamTypesKind {
     Void,
-    Params(Box<Vec<(Type, Id)>>)
+    Params(Vec<(Type, Id)>)
 }
 
-type ParamTypes = Spanned<ParamTypesKind>;
+pub type ParamTypes = Spanned<ParamTypesKind>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TypeKind {
     Char,
     Int,
+    Pointer(Box<TypeKind>),
+    Array(Box<TypeKind>, Option<i32>)
 }
 
-type Type = Spanned<TypeKind>;
+pub type Type = Spanned<TypeKind>;
 
 #[derive(Debug, PartialEq)]
 pub enum ReturnTypeKind {
@@ -135,7 +137,7 @@ pub enum ReturnTypeKind {
     Type(TypeKind)
 }
 
-type ReturnType = Spanned<ReturnTypeKind>;
+pub type ReturnType = Spanned<ReturnTypeKind>;
 
 #[derive(Debug, PartialEq)]
 pub struct Program {
@@ -145,24 +147,23 @@ pub struct Program {
 
 #[derive(Debug, PartialEq)]
 pub enum GlobalDclKind {
-    Var(Type, VarDelc),
+    Var(VarDelc),
     Func(FuncDelc, FuncBody),
-    ExternFunc(FuncDelc)
 }
+
 
 #[derive(Debug, PartialEq)]
 pub struct VarDelc {
     pub span: Span,
-    pub var_type: Type,
-    pub names: Vec<VarName>
+    pub names: Vec<(Type, Id)>
 }
 
 #[derive(Debug, PartialEq)]
 pub enum VarNameKind {
     Single(Id),
-    Array(Id, u32),
+    Array(Id, i32),
 }
-type VarName = Spanned<VarNameKind>;
+pub type VarName = Spanned<VarNameKind>;
 
 #[derive(Debug, PartialEq)]
 pub struct FuncDelc {
@@ -176,7 +177,7 @@ pub struct FuncDelc {
 pub struct FuncBody {
     pub span: Span,
     pub var_decls: Vec<VarDelc>,
-    pub stmt: Stmt,
+    pub stmt: Vec<Stmt>,
 }
 
 
