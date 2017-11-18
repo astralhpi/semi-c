@@ -101,6 +101,7 @@ int avg(int count, int *value) {
     int i, total;
     int sum = 0;
     for (i = 1; i < count; i++) {
+        int a;
         total = total + value[i];
     }
 

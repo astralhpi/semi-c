@@ -111,6 +111,7 @@ pub enum StmtKind {
     Assign(Box<Assg>),
     Call(Id, Vec<Expr>),
     Block(Vec<Stmt>),
+    VarDelc(Box<VarDelc>),
     Empty,
 }
 
@@ -179,7 +180,6 @@ pub struct FuncDelc {
 #[derive(Debug, PartialEq)]
 pub struct FuncBody {
     pub span: Span,
-    pub var_decls: Vec<VarDelc>,
     pub stmt: Vec<Stmt>,
 }
 

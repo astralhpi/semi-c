@@ -100,7 +100,7 @@ pub ReturnType: ast::ReturnType = {
 
 pub Func: ast::GlobalDclKind = {
     <fl:@L> <t:ReturnType> <id:Id> "(" <p:ParamTypes> ")" <fr:@R>
-    <bl:@L> "{" <delc:Multi<VarDelc>> <stmt:Multi<Stmt>>  "}" <br:@R>  =>{
+    <bl:@L> "{" <stmt:Multi<Stmt>>  "}" <br:@R>  =>{
         ast::GlobalDclKind::Func(ast::FuncDelc{
             span: Span::new(fl, fr),
             return_type: t,
@@ -109,7 +109,6 @@ pub Func: ast::GlobalDclKind = {
         },
         ast::FuncBody{
             span: Span::new(bl, br),
-            var_decls: delc,
             stmt: stmt
         })
     }
@@ -209,6 +208,10 @@ pub Stmt: ast::Stmt = {
         span: Span::new(l, r),
         node: ast::StmtKind::Block(s)
     },
+    <l:@L> <v:VarDelc> <r:@R> => ast::Stmt {
+        span: Span::new(l, r),
+        node: ast::StmtKind::VarDelc(Box::new(v))
+    }
 };
 
 pub Matched: ast::Stmt = {
