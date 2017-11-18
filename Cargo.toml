@@ -1,12 +1,8 @@
 [package]
-authors = ["Song Jaehak <jaehak@hpi.cc>"]
-build = "build.rs"
 name = "semi-c"
 version = "0.1.0"
-
-[build-dependencies]
-lalrpop = "0.13.1"
+authors = ["Song Jaehak <jaehak@hpi.cc>"]
 
 [dependencies]
-lalrpop-util = "0.13.1"
-regex = "0.2.2"
+parser = { path = "./parser" }
+

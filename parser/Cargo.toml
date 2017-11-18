@@ -1,0 +1,12 @@
+[package]
+authors = ["Song Jaehak <jaehak@hpi.cc>"]
+build = "build.rs"
+name = "parser"
+version = "0.1.0"
+
+[build-dependencies]
+lalrpop = "0.13.1"
+
+[dependencies]
+lalrpop-util = "0.13.1"
+regex = "0.2.2"
