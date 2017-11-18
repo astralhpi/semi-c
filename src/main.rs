@@ -1,9 +1,12 @@
 extern crate parser;
+extern crate lalrpop_util;
 
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 use std::io::prelude::*;
+
+use lalrpop_util::ParseError::*;
 
 fn read(path:&str) -> String {
     let path = Path::new(path);
@@ -66,10 +69,86 @@ fn test_line_column() {
     assert_eq!((2,1), line_column(&line_breaks_pos, 6));
 }
 
+fn parse(code: &str) -> Result<parser::ast::Program, String> {
+    let line_breaks_pos = get_line_break_positions(&code);
+    match parser::semic::parse_Prog(&code) {
+        Ok(ast) => Result::Ok(ast),
+        Err(e) => match e {
+            UnrecognizedToken {token, expected} => {
+                match token {
+                    Option::None => Result::Err(
+                        format!(
+                            "Syntax error : line {}",
+                            line_breaks_pos.len())),
+                    Option::Some((l, t, r)) => {
+                        let (line, col) = line_column(&line_breaks_pos, l);
+                        Result::Err(format!(
+                                "Syntax error: line {}", line + 1))
+                    }
+                }
+            },
+            InvalidToken {location} => {
+                let (line, col) = line_column(&line_breaks_pos, location);
+                Result::Err(format!("Syntax error: line {}", line + 1))
+            },
+            ExtraToken {token} => {
+                let (left, token, right) = token;
+                let (line, col) = line_column(&line_breaks_pos, left);
+                Result::Err(format!("Syntax error: line {}", line + 1))
+            },
+            _ => panic!("wtf")
+        }
+    }
+}
+
+#[test]
+fn test_parse() {
+    let code = r#"int avg(int count, int *value) {
+    int i, total
+    int sum = 0;
+    for (i = 1; i < count; i++) {
+        int a;
+        total = total + value[i];
+    }
+
+    return (total / count);
+}
+
+int main(void) {
+    int studentNumber, count, i, sum;
+    int mark[4];
+    float average;
+    
+    count = 4;
+    sum = 0;
+
+    for (i=0; i < count; i++) {
+        mark[i] = i * 30;
+        sum = sum + mark[i];
+        average = avg(i + 1, mark);
+        if (average > 40) {
+            printf("%f\n", average);
+        }
+    }
+}
+"#;
+    match parse(code) {
+        Ok(ok) => {
+            assert!(false);
+        }
+        Err(e) => {
+            assert_eq!(e, "Syntax error: line 3");
+
+        }
+
+    }
+
+}
+
+
 fn main() {
     let code = read("input.c");
 
     let line_breaks_pos = get_line_break_positions(&code);
-    print!("{:?}\n", &code[102..]);
-    print!("{:?}\n", line_column(&line_breaks_pos, 102));
+    let ast = parse(&code);
 }

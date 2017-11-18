@@ -5,4 +5,5 @@ authors = ["Song Jaehak <jaehak@hpi.cc>"]
 
 [dependencies]
 parser = { path = "./parser" }
+lalrpop-util = "0.13.1"
 
