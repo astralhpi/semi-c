@@ -75,25 +75,26 @@ fn parse(code: &str) -> Result<parser::ast::Program, String> {
         Ok(ast) => Result::Ok(ast),
         Err(e) => match e {
             UnrecognizedToken {token, expected} => {
+                let _expected = expected;
                 match token {
                     Option::None => Result::Err(
                         format!(
                             "Syntax error : line {}",
                             line_breaks_pos.len())),
-                    Option::Some((l, t, r)) => {
-                        let (line, col) = line_column(&line_breaks_pos, l);
+                    Option::Some((l, _, _)) => {
+                        let (line, _) = line_column(&line_breaks_pos, l);
                         Result::Err(format!(
                                 "Syntax error: line {}", line + 1))
                     }
                 }
             },
             InvalidToken {location} => {
-                let (line, col) = line_column(&line_breaks_pos, location);
+                let (line, _) = line_column(&line_breaks_pos, location);
                 Result::Err(format!("Syntax error: line {}", line + 1))
             },
             ExtraToken {token} => {
-                let (left, token, right) = token;
-                let (line, col) = line_column(&line_breaks_pos, left);
+                let (left, _, _) = token;
+                let (line, _) = line_column(&line_breaks_pos, left);
                 Result::Err(format!("Syntax error: line {}", line + 1))
             },
             _ => panic!("wtf")
@@ -133,7 +134,7 @@ int main(void) {
 }
 "#;
     match parse(code) {
-        Ok(ok) => {
+        Ok(_) => {
             assert!(false);
         }
         Err(e) => {
@@ -149,6 +150,5 @@ int main(void) {
 fn main() {
     let code = read("input.c");
 
-    let line_breaks_pos = get_line_break_positions(&code);
     let ast = parse(&code);
 }
