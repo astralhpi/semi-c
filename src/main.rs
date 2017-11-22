@@ -1,6 +1,7 @@
 extern crate parser;
 extern crate lalrpop_util;
 
+mod symbol_table;
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
@@ -143,7 +144,6 @@ int main(void) {
         }
 
     }
-
 }
 
 
