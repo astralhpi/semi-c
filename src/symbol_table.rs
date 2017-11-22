@@ -32,7 +32,7 @@ impl<K: Hash + Eq, V> SymbolTable<K, V> {
     }
 
     #[must_use]
-    pub fn pushScope(mut self) -> SymbolTable<K, V>{
+    pub fn push_scope(mut self) -> SymbolTable<K, V>{
         self.node = Node {
             parent: Option::Some(Box::new(self.node)),
             table: HashMap::new()
@@ -41,7 +41,7 @@ impl<K: Hash + Eq, V> SymbolTable<K, V> {
         self
     }
     #[must_use]
-    pub fn dropScope(mut self) -> SymbolTable<K, V>{
+    pub fn drop_scope(mut self) -> SymbolTable<K, V>{
         match self.node.parent {
             Some(node) => {
                 self.node = *node;
@@ -59,7 +59,7 @@ impl<K: Hash + Eq, V> SymbolTable<K, V> {
     pub fn get(&self, key: &K) -> Option<&V> {
         match self.get_with_depth(key) {
             Option::None => Option::None,
-            Option::Some((value, depth)) => Option::Some(value)
+            Option::Some((value, _)) => Option::Some(value)
         }
 
     }
@@ -74,6 +74,7 @@ impl<K: Hash + Eq, V> SymbolTable<K, V> {
                     return Option::Some((v, depth));
                 },
                 Option::None => {
+                    depth -= 1;
                     match node.next() {
                         Option::Some(n) => node = n,
                         Option::None => return Option::None
@@ -91,16 +92,16 @@ impl<K: Hash + Eq, V> SymbolTable<K, V> {
 fn sym_table() {
     let mut table: SymbolTable<String, String> = SymbolTable::new();
     assert_eq!(table.depth, 0);
-    table = table.pushScope();
+    table = table.push_scope();
     assert_eq!(table.depth, 1);
-    table = table.dropScope();
+    table = table.drop_scope();
     assert_eq!(table.depth, 0);
 
     table.insert("a".to_string(), "1".to_string());
-    table = table.pushScope();
+    table = table.push_scope();
     table.insert("a".to_string(), "2".to_string());
     assert_eq!(table.get(&"a".to_string()).unwrap(), "2");
-    table = table.dropScope();
+    table = table.drop_scope();
     assert_eq!(table.get(&"a".to_string()).unwrap(), "1");
 
 }
