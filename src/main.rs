@@ -2,10 +2,16 @@ extern crate parser;
 extern crate lalrpop_util;
 
 mod symbol_table;
+mod flow_graph;
+mod meta_data;
+
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 use std::io::prelude::*;
+use meta_data::MetaData;
+
+use parser::ast;
 
 use lalrpop_util::ParseError::*;
 
@@ -26,53 +32,8 @@ fn read(path:&str) -> String {
 
 }
 
-fn get_line_break_positions(code: &str) -> Vec<usize> {
-    let mut line_breaks_pos: Vec<usize> = vec![];
-    let mut i = 0;
-    for c in code.chars() {
-        if c == '\n' {
-            line_breaks_pos.push(i);
-        }
-        i += 1;
-    }
-    line_breaks_pos 
-}
-
-fn line_column(line_break_pos: &Vec<usize>, pos: usize) -> (usize, usize) {
-    let mut line = 0;
-    for i in line_break_pos {
-        if pos < i + 1 {
-            break;
-        }
-        line += 1;
-    }
-
-    if line == 0 {
-        (0, pos)
-
-    }
-    else {
-        (line, pos - line_break_pos[line - 1] - 1)
-    }
-}
-
-#[test]
-fn test_line_column() {
-    let code = "a\nbc\ndef";
-    let line_breaks_pos = get_line_break_positions(&code);
-    assert_eq!(vec![1, 4], line_breaks_pos);
-    assert_eq!((0,0), line_column(&line_breaks_pos, 0));
-    assert_eq!((0,1), line_column(&line_breaks_pos, 1));
-    assert_eq!((1,0), line_column(&line_breaks_pos, 2));
-    assert_eq!((1,1), line_column(&line_breaks_pos, 3));
-    assert_eq!((1,2), line_column(&line_breaks_pos, 4));
-    assert_eq!((2,0), line_column(&line_breaks_pos, 5));
-    assert_eq!((2,1), line_column(&line_breaks_pos, 6));
-}
-
-fn parse(code: &str) -> Result<parser::ast::Program, String> {
-    let line_breaks_pos = get_line_break_positions(&code);
-    match parser::semic::parse_Prog(&code) {
+fn parse(meta: &MetaData) -> Result<parser::ast::Program, String> {
+    match parser::semic::parse_Prog(&meta.code) {
         Ok(ast) => Result::Ok(ast),
         Err(e) => match e {
             UnrecognizedToken {token, expected} => {
@@ -81,21 +42,21 @@ fn parse(code: &str) -> Result<parser::ast::Program, String> {
                     Option::None => Result::Err(
                         format!(
                             "Syntax error : line {}",
-                            line_breaks_pos.len())),
+                            meta.line_count())),
                     Option::Some((l, _, _)) => {
-                        let (line, _) = line_column(&line_breaks_pos, l);
+                        let (line, _) = meta.line_column(l);
                         Result::Err(format!(
                                 "Syntax error: line {}", line + 1))
                     }
                 }
             },
             InvalidToken {location} => {
-                let (line, _) = line_column(&line_breaks_pos, location);
+                let (line, _) = meta.line_column(location);
                 Result::Err(format!("Syntax error: line {}", line + 1))
             },
             ExtraToken {token} => {
                 let (left, _, _) = token;
-                let (line, _) = line_column(&line_breaks_pos, left);
+                let (line, _) = meta.line_column(left);
                 Result::Err(format!("Syntax error: line {}", line + 1))
             },
             _ => panic!("wtf")
@@ -134,7 +95,8 @@ int main(void) {
     }
 }
 "#;
-    match parse(code) {
+    let meta = MetaData::new(code.to_string());
+    match parse(&meta) {
         Ok(_) => {
             assert!(false);
         }
@@ -146,9 +108,8 @@ int main(void) {
     }
 }
 
-
 fn main() {
     let code = read("input.c");
-
-    let ast = parse(&code);
+    let meta = MetaData::new(code);
+    parse(&meta);
 }
