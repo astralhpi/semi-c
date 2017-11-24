@@ -53,7 +53,6 @@ fn meta_data() {
     int i, total = 0;
     int sum = 0;
     for (i = 1; i < count; i++) {
-        int a;
         total = total + value[i];
     }
 
