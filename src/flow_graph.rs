@@ -69,7 +69,9 @@ pub enum Instruction {
     LoadString(String),
     LoadChar(char),
     LoadInt(i32),
-    FuncCall { name: String, args_size: usize }
+    FuncCall { name: String, args_size: usize },
+    CharToInt,
+    IntToFloat
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -268,10 +270,10 @@ impl AstConvert {
                     for (i, ref item) in args.iter().enumerate() {
                         let (mut flow, t) = AstConvert::convert_expr(
                             item, type_table)?;
-                        if arg_types[i] != t {
-                            return Err(Error::TypeError(span.clone()));
-                        }
+                        let mut cast = AstConvert::auto_type_cast(
+                            &t, &arg_types[i], span)?;
                         result.append(&mut flow);
+                        result.append(&mut cast);
                     }
 
                     result.push_back(Node {
@@ -324,6 +326,32 @@ impl AstConvert {
         }
     }
 
+    pub fn auto_type_cast(from: &Type,
+                          to: &Type,
+                          span: &Span) -> ConvertResult<Flow> {
+        let mut result = Flow::new();
+        if from == to {
+            Ok(result)
+        } else {
+            match (from, to) {
+                (&Type::Char, &Type::Int) => {
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::CharToInt
+                    });
+                },
+                (&Type::Int, &Type::Float) => {
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::IntToFloat
+                    });
+                },
+                (_, _) => return Err(Error::TypeError(span.clone())),
+            };
+            Ok(result)
+        }
+    }
+
 }
 
 
@@ -351,6 +379,4 @@ fn simple_program() {
     let ast = parse(&meta).unwrap();
     let func_table = AstConvert::convert_program(&ast).unwrap();
     assert_eq!(func_table.len(), 1);
-    print!("{:?}", func_table);
-    assert!(false);
 }
