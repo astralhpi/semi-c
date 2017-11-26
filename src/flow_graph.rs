@@ -8,14 +8,40 @@ use error::syntax_error;
 use helper::parse;
 use symbol_table::SymbolTable;
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum Type {
     Void,
     Char,
     Int,
     Float,
     Pointer(Box<Type>),
-    Arrow(Box<Type>, Vec<Type>),
+    Arrow(Vec<Type>, Box<Type>),
+}
+
+impl <'a> From<&'a ast::TypeKind> for Type {
+    fn from(type_kind: &ast::TypeKind) -> Type {
+        match type_kind {
+            &ast::TypeKind::Char => Type::Char,
+            &ast::TypeKind::Int => Type::Int,
+            &ast::TypeKind::Float => Type::Float,
+            &ast::TypeKind::Pointer(ref b) => {
+                Type::Pointer(Box::new(Type::from(b.as_ref())))
+            },
+            &ast::TypeKind::Array(ref b, _) => {
+                Type::Pointer(Box::new(Type::from(b.as_ref())))
+            }
+        }
+
+    }
+}
+
+impl <'a> From<&'a ast::ReturnTypeKind> for Type {
+    fn from(return_type: &ast::ReturnTypeKind) -> Type {
+        match return_type {
+            &ast::ReturnTypeKind::Void => Type::Void,
+            &ast::ReturnTypeKind::Type(ref t) => Type::from(t)
+        }
+    }
 }
 
 pub struct Func {
@@ -72,100 +98,107 @@ impl Node {
     }
 }
 
-pub fn convert_type(ast: &ast::TypeKind, meta: &MetaData) -> Type {
-    match ast {
-        &ast::TypeKind::Char => Type::Char,
-        &ast::TypeKind::Int => Type::Int,
-        &ast::TypeKind::Float => Type::Float,
-        &ast::TypeKind::Pointer(ref b) => {
-            Type::Pointer(Box::new(convert_type(b.as_ref(), meta)))
-        },
-        &ast::TypeKind::Array(ref b, _) => {
-            Type::Pointer(Box::new(convert_type(b.as_ref(), meta)))
-        }
-    }
-}
+struct Ast {}
 
-pub fn convert_return_type(
-        ast: &ast::ReturnType,
-        meta: &MetaData) -> Result<Type, String> {
-    match &ast.node {
-        &ast::ReturnTypeKind::Void => Result::Ok(Type::Void),
-        &ast::ReturnTypeKind::Type(ref t) => {
-            Result::Ok(convert_type(&t, meta))
-        }
-    }
-}
+impl Ast {
+    fn convert_param_types(param_types: &ast::ParamTypes)
+            -> Vec<(Type, String)> {
 
-pub fn convert_param_types(
-    ast: &ast::ParamTypes,
-    meta: &MetaData) -> Result<Vec<(Type, String)>, String> {
-    let mut result: Vec<(Type, String)> = vec![];
-    match &ast.node {
-        &ast::ParamTypesKind::Void => {},
-        &ast::ParamTypesKind::Params(ref vec) => {
-            for item in vec {
-                let (ref t, ref id) = *item;
-                result.push((convert_type(&t.node, meta), id.node.clone()));
+        let mut result: Vec<(Type, String)> = vec![];
+        match &param_types.node {
+            &ast::ParamTypesKind::Void => {},
+            &ast::ParamTypesKind::Params(ref vec) => {
+                for item in vec {
+                    let (ref t, ref id) = *item;
+                    let t = Type::from(&t.node);
+                    result.push((t, id.node.clone()));
+                }
             }
-        }
-    };
+        };
 
-    Result::Ok(result)
+        result
+    }
 }
 
-pub fn convert_ast(
-        ast: &ast::Program,
-        meta: &MetaData) -> Result<HashMap<String, Func>, String> {
 
-    let mut table: HashMap<String, Func>  = HashMap::new();
-    for dcl in &ast.declines {
+
+fn push_funcs(
+        table: &mut SymbolTable<String, Type>,
+        program: &ast::Program) {
+    for dcl in program.declines.iter() {
         match dcl {
-            &ast::GlobalDclKind::Var(ref var_delc) => {
-                return syntax_error(meta, var_delc.span.lo);
-            },
-            &ast::GlobalDclKind::Func(ref dcl, ref body) => {
-                let return_type = convert_return_type(&dcl.return_type, meta)?;
-                let name = dcl.id.node.to_string();
-                let params = convert_param_types(&dcl.param_types, meta)?;
-                let instructions: Vec<Instruction> = vec![];
-                let func = Func {
-                    span: dcl.span.clone(),
-                    name: name.clone(),
-                    return_type,
-                    params,
-                    instructions
-                };
-
-                table.insert(name, func);
-
+            &ast::GlobalDclKind::Func(ref func, _) => {
+                let name = func.id.node.to_string();
+                let return_type = Type::from(&func.return_type.node);
+                let params = Ast::convert_param_types(&func.param_types);
+                let params = params.into_iter().map(
+                    |x: (Type, String)| -> Type {
+                        let (t, _) = x;
+                        t
+                    }).collect();
+                let t = Type::Arrow(params, Box::new(return_type));
+                table.insert(name, t);
             }
+            _ => {}
         }
-    }
-
-    Result::Ok(table)
-}
-
-pub fn convert_stmt(
-    ast: &ast::Stmt,
-    meta: &MetaData,
-    symbol_table: &SymbolTable<String, Type>) -> Node {
-
-    match &ast.node {
-        _ => panic!("no implementation")
 
     }
+
 }
 
-fn some_node(span: Span, eval_type:Type, instruction:Instruction) 
-        -> Result<Node, String> {
-    Result::Ok(Node {
-        span,
-        eval_type,
-        instruction,
-        next: Option::None
-    })
-}
+
+//pub fn convert_ast(
+//        ast: &ast::Program,
+//        meta: &MetaData) -> Result<HashMap<String, Func>, String> {
+//
+//    let mut table: HashMap<String, Func>  = HashMap::new();
+//    for dcl in &ast.declines {
+//        match dcl {
+//            &ast::GlobalDclKind::Var(ref var_delc) => {
+//                return syntax_error(meta, var_delc.span.lo);
+//            },
+//            &ast::GlobalDclKind::Func(ref dcl, ref body) => {
+//                let return_type = convert_return_type(&dcl.return_type, meta)?;
+//                let name = dcl.id.node.to_string();
+//                let params = convert_param_types(&dcl.param_types, meta)?;
+//                let instructions: Vec<Instruction> = vec![];
+//                let func = Func {
+//                    span: dcl.span.clone(),
+//                    name: name.clone(),
+//                    return_type,
+//                    params,
+//                    instructions
+//                };
+//
+//                table.insert(name, func);
+//
+//            }
+//        }
+//    }
+//
+//    Result::Ok(table)
+//}
+//
+//pub fn convert_stmt(
+//    ast: &ast::Stmt,
+//    meta: &MetaData,
+//    symbol_table: &SymbolTable<String, Type>) -> Node {
+//
+//    match &ast.node {
+//        _ => panic!("no implementation")
+//
+//    }
+//}
+//
+//fn some_node(span: Span, eval_type:Type, instruction:Instruction) 
+//        -> Result<Node, String> {
+//    Result::Ok(Node {
+//        span,
+//        eval_type,
+//        instruction,
+//        next: Option::None
+//    })
+//}
 
 //pub fn convert_expr_vec(
 //        ast_vec: &Vec<ast::Expr>,
@@ -283,12 +316,27 @@ fn some_node(span: Span, eval_type:Type, instruction:Instruction)
 //}
 
 #[test]
+fn test_push_funcs() {
+    let code = r#"int main(void) {
+        printf("Hello Wordl!");
+    }"#;
+    let meta = MetaData::new(code.to_string());
+    let ast = parse(&meta).unwrap();
+    let mut table: SymbolTable<String, Type> = SymbolTable::new();
+    table.push_scope();
+    push_funcs(&mut table, &ast);
+    assert_eq!(
+        table.get(&"main".to_string()).unwrap(),
+        &Type::Arrow(vec![], Box::new(Type::Int)));
+}
+
+#[test]
 fn simple_program() {
     let code = r#"int main(void) {
         printf("Hello Wordl!");
     }"#;
     let meta = MetaData::new(code.to_string());
     let ast = parse(&meta).unwrap();
-    let func_table = convert_ast(&ast, &meta).unwrap();
-    assert_eq!(1, func_table.len());
+//    let func_table = convert_ast(&ast, &meta).unwrap();
+//    assert_eq!(1, func_table.len());
 }
