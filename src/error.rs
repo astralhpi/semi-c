@@ -6,6 +6,7 @@ use parser::ast::Span;
 pub enum Error {
     TypeError(Span),
     NotImplementedSyntax(Span),
+    NotDeclared(Span),
 }
 
 pub fn syntax_error<T>(meta:&MetaData, loc:usize) -> Result<T, String> {
