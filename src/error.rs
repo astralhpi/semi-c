@@ -7,6 +7,7 @@ pub enum Error {
     TypeError(Span),
     NotImplementedSyntax(Span),
     NotDeclared(Span),
+    NoVariable(Span),
 }
 
 pub fn syntax_error<T>(meta:&MetaData, loc:usize) -> Result<T, String> {

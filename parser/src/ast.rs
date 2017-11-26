@@ -37,10 +37,13 @@ pub enum BinOpKind {
     Sub,
     Mul,
     Div,
+
     And,
     Or,
+
     Eq,
     Ne,
+
     Lt,
     Le,
     Gt,
@@ -106,7 +109,7 @@ pub enum StmtKind {
     While(Box<Expr>, Box<Stmt>),
     // for(assg;expr;assg) stmt
     For(Option<Box<Assg>>, Option<Box<Expr>>, Option<Box<Assg>>, Box<Stmt>),
-    // return expr
+    // return expr;
     Return(Option<Box<Expr>>),
     Assign(Box<Assg>),
     Call(Id, Vec<Expr>),

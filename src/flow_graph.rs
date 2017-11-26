@@ -65,13 +65,49 @@ pub struct FuncDecl {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Instruction {
+    // function call
     Printf { args_size: usize },
+    FuncCall { name: String, args_size: usize },
+
+    // load
     LoadString(String),
     LoadChar(char),
     LoadInt(i32),
-    FuncCall { name: String, args_size: usize },
+
+    // load variable
+    LoadVar(String),
+
+    // convert
     CharToInt,
-    IntToFloat
+    IntToFloat,
+
+    // unary op
+    Not,
+    Minus,
+    
+    // bin op
+    Addi,
+    Addf,
+    Subi,
+    Subf,
+    Muli,
+    Mulf,
+    Divi,
+    Divf,
+    And,
+    Or,
+    Eqi,
+    Eqf,
+    Lti,
+    Ltf,
+    Gti,
+    Gtf,
+
+    // control
+    Return,
+    ReturnVoid,
+    Pop,
+
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -227,9 +263,43 @@ impl Convert {
         
         match &stmt.node {
             &ast::StmtKind::Call(ref id, ref exprs) => {
-                let (flow, t) = Convert::convert_func_call(
+                let (mut flow, t) = Convert::convert_func_call(
                     id.node.to_string(), exprs, &stmt.span, type_table)?;
+                flow.push_back(Node {
+                    span: stmt.span.clone(),
+                    instruction: Instruction::Pop,
+                });
                 Ok(flow)
+
+            },
+            &ast::StmtKind::Return(ref b) => {
+                match b {
+                    &Some(ref e) => {
+                        let (mut flow, t) = Convert::convert_expr(e, type_table)?;
+                        if return_type != &t {
+                            Err(Error::TypeError(stmt.span.clone()))
+                        } else {
+                            flow.push_back(Node {
+                                span: stmt.span.clone(),
+                                instruction: Instruction::Return
+                            });
+                            Ok(flow)
+                        }
+                    }
+                    &None => {
+                        if return_type == &Type::Void {
+                            let mut flow = Flow::new();
+                            flow.push_back(Node {
+                                span: stmt.span.clone(),
+                                instruction: Instruction::ReturnVoid
+                            });
+                            Ok(flow)
+
+                        } else {
+                            Err(Error::TypeError(stmt.span.clone()))
+                        }
+                    }
+                }
 
             },
             _ => Err(Error::NotImplementedSyntax(stmt.span.clone()))
@@ -322,9 +392,281 @@ impl Convert {
                     },
                 }
             },
-            _ => Err(Error::NotImplementedSyntax(expr.span.clone()))
+            &ast::ExprKind::Binary(ref bin_op, ref left, ref right) => {
+                let (mut left_flow, left_type)  = Convert::convert_expr(
+                    left, type_table)?;
+                let (mut right_flow, right_type) = Convert::convert_expr(
+                    right, type_table)?;
+                let target_type = Convert::target_type(&left_type,
+                                                       &right_type,
+                                                       &bin_op.node);
+                left_flow.append(
+                    &mut Convert::auto_type_cast(
+                        &left_type, &target_type, &left.span)?);
+                right_flow.append(
+                    &mut Convert::auto_type_cast(
+                        &right_type, &target_type, &right.span)?);
+
+                left_flow.append(&mut right_flow);
+
+                Ok((left_flow, target_type.clone()))
+            },
+            &ast::ExprKind::Id(ref id) => {
+                match type_table.get(&id.node) {
+                    Some(t) => {
+                        let mut flow = Flow::new();
+                        flow.push_back(Node {
+                            span: expr.span.clone(),
+                            instruction: Instruction::LoadVar(id.node.to_string())
+                        });
+                        Ok((flow, t.clone()))
+                        
+                    },
+                    None => Err(Error::NoVariable(expr.span.clone()))
+
+                }
+            },
+            &ast::ExprKind::Call(ref id, ref exprs) => {
+                Convert::convert_func_call(
+                    id.node.to_string(), exprs, &expr.span, type_table)
+
+            },
+            _ => {
+                Err(Error::NotImplementedSyntax(expr.span.clone()))
+            }
         }
     }
+
+    pub fn convert_bin_op(op: &ast::BinOp, t: &Type) -> ConvertResult<(Flow, Type)> {
+        let mut result = Flow::new();
+        match &op.node {
+            &ast::BinOpKind::Add => match t {
+                &Type::Int => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Addi,
+                    });
+                    Ok((result, Type::Int))
+                },
+                &Type::Float => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Addf,
+                    });
+                    Ok((result, Type::Float))
+                },
+                _ => Err(Error::TypeError(op.span.clone()))
+            },
+            &ast::BinOpKind::Sub => match t {
+                &Type::Int => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Subi,
+                    });
+                    Ok((result, Type::Int))
+                },
+                &Type::Float => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Subf,
+                    });
+                    Ok((result, Type::Float))
+                },
+                _ => Err(Error::TypeError(op.span.clone()))
+            },
+            &ast::BinOpKind::Mul => match t {
+                &Type::Int => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Muli,
+                    });
+                    Ok((result, Type::Int))
+                },
+                &Type::Float => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Mulf,
+                    });
+                    Ok((result, Type::Float))
+                },
+                _ => Err(Error::TypeError(op.span.clone()))
+            },
+            &ast::BinOpKind::Div => match t {
+                &Type::Int => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Divi,
+                    });
+                    Ok((result, Type::Int))
+                },
+                &Type::Float => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Divf,
+                    });
+                    Ok((result, Type::Float))
+                },
+                _ => Err(Error::TypeError(op.span.clone()))
+            },
+            &ast::BinOpKind::And => match t {
+                &Type::Int => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::And,
+                    });
+                    Ok((result, Type::Int))
+                },
+                _ => Err(Error::TypeError(op.span.clone()))
+            },
+            &ast::BinOpKind::Or => match t {
+                &Type::Int => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Or,
+                    });
+                    Ok((result, Type::Int))
+                },
+                _ => Err(Error::TypeError(op.span.clone()))
+            },
+            &ast::BinOpKind::Eq => match t {
+                &Type::Int => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Eqi,
+                    });
+                    Ok((result, Type::Int))
+                },
+                &Type::Float => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Eqf,
+                    });
+                    Ok((result, Type::Int))
+                },
+                _ => Err(Error::TypeError(op.span.clone()))
+            },
+            &ast::BinOpKind::Ne => match t {
+                &Type::Int => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Eqi,
+                    });
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Not,
+                    });
+                    Ok((result, Type::Int))
+                },
+                &Type::Float => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Addf,
+                    });
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Not,
+                    });
+                    Ok((result, Type::Int))
+                },
+                _ => Err(Error::TypeError(op.span.clone()))
+            },
+            &ast::BinOpKind::Lt => match t {
+                &Type::Int => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Lti,
+                    });
+                    Ok((result, Type::Int))
+                },
+                &Type::Float => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Ltf,
+                    });
+                    Ok((result, Type::Int))
+                },
+                _ => Err(Error::TypeError(op.span.clone()))
+            },
+            &ast::BinOpKind::Le => match t {
+                &Type::Int => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Gti,
+                    });
+
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Not,
+                    });
+
+                    Ok((result, Type::Int))
+                },
+                &Type::Float => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Gtf,
+                    });
+
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Not,
+                    });
+
+                    Ok((result, Type::Int))
+                },
+                _ => Err(Error::TypeError(op.span.clone()))
+            },
+            &ast::BinOpKind::Gt => match t {
+                &Type::Int => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Gti,
+                    });
+                    Ok((result, Type::Int))
+                },
+                &Type::Float => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Gtf,
+                    });
+
+                    Ok((result, Type::Int))
+                },
+                _ => Err(Error::TypeError(op.span.clone()))
+            },
+            &ast::BinOpKind::Ge => match t {
+                &Type::Int => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Lti,
+                    });
+
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Not,
+                    });
+
+                    Ok((result, Type::Int))
+                },
+                &Type::Float => {
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Ltf,
+                    });
+
+                    result.push_back(Node {
+                        span: op.span.clone(),
+                        instruction: Instruction::Not,
+                    });
+
+                    Ok((result, Type::Int))
+                },
+                _ => Err(Error::TypeError(op.span.clone()))
+            },
+        }
+
+    }
+
 
     pub fn auto_type_cast(from: &Type,
                           to: &Type,
@@ -340,6 +682,16 @@ impl Convert {
                         instruction: Instruction::CharToInt
                     });
                 },
+                (&Type::Char, &Type::Float) => {
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::CharToInt
+                    });
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::IntToFloat
+                    });
+                },
                 (&Type::Int, &Type::Float) => {
                     result.push_back(Node {
                         span: span.clone(),
@@ -350,6 +702,45 @@ impl Convert {
             };
             Ok(result)
         }
+    }
+
+    pub fn target_type<'a>(
+            t1:&'a Type, t2:&'a Type, op: &ast::BinOpKind) -> &'a Type {
+        match op {
+            &ast::BinOpKind::Add | &ast::BinOpKind::Sub |
+                    &ast::BinOpKind::Mul | &ast::BinOpKind::Div |
+                    &ast::BinOpKind::Eq | &ast::BinOpKind::Ne |
+                    &ast::BinOpKind::Lt | &ast::BinOpKind::Le |
+                    &ast::BinOpKind::Gt | &ast::BinOpKind::Ge => {
+
+                let l1 = Convert::type_level(t1);
+                let l2 = Convert::type_level(t2);
+                let li = Convert::type_level(&Type::Int);
+
+                if l1 < li && l2 < li {
+                    &Type::Int
+                } else if l1 > l2 {
+                    t1
+                } else {
+                    t2
+                }
+            },
+            &ast::BinOpKind::And | &ast::BinOpKind::Or => {
+                &Type::Int
+            }
+        }
+    }
+    
+    pub fn type_level(t:&Type) -> u32{
+        match t {
+            &Type::Void => 0,
+            &Type::Pointer(_) => 0,
+            &Type::Arrow(_, _) => 0,
+            &Type::Char => 1,
+            &Type::Int => 2,
+            &Type::Float => 3
+        }
+
     }
 
 }
@@ -371,12 +762,27 @@ fn test_push_funcs() {
 }
 
 #[test]
-fn simple_program() {
+fn hello_world() {
     let code = r#"int main(void) {
         printf("Hello Wordl!");
     }"#;
     let meta = MetaData::new(code.to_string());
     let ast = parse(&meta).unwrap();
-    let func_table = AstConvert::convert_program(&ast).unwrap();
+    let func_table = Convert::convert_program(&ast).unwrap();
     assert_eq!(func_table.len(), 1);
+}
+
+#[test]
+fn simple_calc() {
+let code = r#"
+int add(int a, int b) {
+    return a + b;
+}
+int main(void) {
+    printf("%d", add(1, 2));
+}"#;
+    let meta = MetaData::new(code.to_string());
+    let ast = parse(&meta).unwrap();
+    let func_table = Convert::convert_program(&ast).unwrap();
+    assert_eq!(func_table.len(), 2);
 }
