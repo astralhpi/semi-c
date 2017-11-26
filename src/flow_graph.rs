@@ -100,7 +100,7 @@ impl TypeTable {
                 &ast::GlobalDclKind::Func(ref func, _) => {
                     let name = func.id.node.to_string();
                     let return_type = Type::from(&func.return_type.node);
-                    let params = AstConvert::convert_param_types(&func.param_types);
+                    let params = Convert::convert_param_types(&func.param_types);
                     let params = params.into_iter().map(
                         |x: (Type, String)| -> Type {
                             let (t, _) = x;
@@ -126,9 +126,9 @@ impl TypeTable {
 
 }
 
-struct AstConvert {}
+struct Convert {}
 
-impl AstConvert {
+impl Convert {
 
     fn convert_param_types(param_types: &ast::ParamTypes)
             -> Vec<(Type, String)> {
@@ -167,7 +167,7 @@ impl AstConvert {
                 &ast::GlobalDclKind::Func(ref dcl, ref body) => {
                     let return_type = Type::from(&dcl.return_type.node);
                     let name = dcl.id.node.to_string();
-                    let params = AstConvert::convert_param_types(
+                    let params = Convert::convert_param_types(
                         &dcl.param_types);
 
 
@@ -181,7 +181,7 @@ impl AstConvert {
                         params,
                     };
 
-                    let flow = AstConvert::convert_stmts(
+                    let flow = Convert::convert_stmts(
                         &body.stmt,
                         &mut type_table,
                         &decl.return_type)?;
@@ -213,7 +213,7 @@ impl AstConvert {
 
         for stmt in stmts.iter() {
 
-            let mut flow = AstConvert::convert_stmt(
+            let mut flow = Convert::convert_stmt(
                 stmt, type_table, return_type)?;
             result.append(&mut flow);
         }
@@ -227,7 +227,7 @@ impl AstConvert {
         
         match &stmt.node {
             &ast::StmtKind::Call(ref id, ref exprs) => {
-                let (flow, t) = AstConvert::convert_func_call(
+                let (flow, t) = Convert::convert_func_call(
                     id.node.to_string(), exprs, &stmt.span, type_table)?;
                 Ok(flow)
 
@@ -246,7 +246,7 @@ impl AstConvert {
                 return Err(Error::TypeError(span.clone()));
             } else {
                 for (i, ref item) in args.iter().enumerate() {
-                    let (mut flow, t) = AstConvert::convert_expr(item, type_table)?;
+                    let (mut flow, t) = Convert::convert_expr(item, type_table)?;
                     if i == 0 && t != Type::Pointer(Box::new(Type::Char)) {
                         return Err(Error::TypeError(item.span.clone()));
                     }
@@ -268,9 +268,9 @@ impl AstConvert {
                     }
 
                     for (i, ref item) in args.iter().enumerate() {
-                        let (mut flow, t) = AstConvert::convert_expr(
+                        let (mut flow, t) = Convert::convert_expr(
                             item, type_table)?;
-                        let mut cast = AstConvert::auto_type_cast(
+                        let mut cast = Convert::auto_type_cast(
                             &t, &arg_types[i], span)?;
                         result.append(&mut flow);
                         result.append(&mut cast);
