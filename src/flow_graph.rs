@@ -74,17 +74,19 @@ pub fn convert_ast(
     for dcl in &ast.declines {
         match dcl {
             &ast::GlobalDclKind::Var(ref var_delc) => {
-                return Result::Err(syntax_error(meta, var_delc.span.lo))
+                return syntax_error(meta, var_delc.span.lo);
             },
             &ast::GlobalDclKind::Func(ref dcl, ref body) => {
                 let return_type = convert_return_type(&dcl.return_type, meta)?;
                 let name = dcl.id.node.to_string();
                 let params = convert_param_types(&dcl.param_types, meta)?;
+                let instructions: Vec<Instruction> = vec![];
                 let func = Func {
                     span: dcl.span.clone(),
                     name: name.clone(),
                     return_type,
-                    params
+                    params,
+                    instructions
                 };
 
                 table.insert(name, func);

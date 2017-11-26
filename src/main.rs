@@ -6,6 +6,7 @@ mod error;
 mod symbol_table;
 mod flow_graph;
 mod helper;
+mod interpreter;
 
 use meta_data::MetaData;
 use helper::{read, parse};

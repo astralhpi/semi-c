@@ -21,17 +21,17 @@ pub fn parse(meta: &MetaData) -> Result<parser::ast::Program, String> {
                             "Syntax error : line {}",
                             meta.line_count())),
                     Option::Some((l, _, _)) => {
-                        Result::Err(syntax_error(meta, l))
+                        syntax_error(meta, l)
                     }
                 }
             },
             InvalidToken {location} => {
-                Result::Err(syntax_error(meta, location))
+                syntax_error(meta, location)
             },
             ExtraToken {token} => {
                 let (left, _, _) = token;
                 let (line, _) = meta.line_column(left);
-                Result::Err(syntax_error(meta, line))
+                syntax_error(meta, line)
             },
             _ => panic!("wtf")
         }
