@@ -4,7 +4,7 @@ use std::cmp::Eq;
 
 
 pub struct SymbolTable<K: Hash + Eq, V>{
-    list: LinkedList<HashMap<K, V>>,
+    pub list: LinkedList<HashMap<K, V>>,
 }
 
 

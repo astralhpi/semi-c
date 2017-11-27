@@ -9,8 +9,10 @@ pub enum Error {
     NotDeclared(Span),
     NoVariable(Span),
     NoMain,
-    Runtime,
-    NotImplementedRuntime(Span),
+    Runtime(String),
+    NoScope,
+    AlreadyDeclaredVar,
+    NotImplementedRuntime(String, Span),
 }
 
 pub fn syntax_error<T>(meta:&MetaData, loc:usize) -> Result<T, String> {

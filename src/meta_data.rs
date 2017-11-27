@@ -29,6 +29,10 @@ impl MetaData {
             (line, pos - self.line_break_pos[line - 1] - 1)
         }
     }
+    pub fn line(&self, pos: usize) -> usize {
+        let (line, _) = self.line_column(pos);
+        line
+    }
 
     pub fn line_count(&self) -> usize {
         self.line_break_pos.len() + 1
