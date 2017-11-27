@@ -221,6 +221,10 @@ impl Convert {
                         &body.stmt,
                         &mut type_table,
                         &decl.return_type)?;
+                    flow.push_back(Node {
+                        span: dcl.span.clone(),
+                        instruction: Instruction::ReturnVoid
+                    });
 
 
                     type_table.drop_scope();
