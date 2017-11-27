@@ -1,9 +1,10 @@
 [package]
+authors = ["Song Jaehak <jaehak@hpi.cc>"]
 name = "semi-c"
 version = "0.1.0"
-authors = ["Song Jaehak <jaehak@hpi.cc>"]
 
 [dependencies]
-parser = { path = "./parser" }
 lalrpop-util = "0.13.1"
 
+[dependencies.parser]
+path = "./parser"

@@ -8,6 +8,9 @@ pub enum Error {
     NotImplementedSyntax(Span),
     NotDeclared(Span),
     NoVariable(Span),
+    NoMain,
+    Runtime,
+    NotImplementedRuntime(Span),
 }
 
 pub fn syntax_error<T>(meta:&MetaData, loc:usize) -> Result<T, String> {

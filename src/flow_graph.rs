@@ -52,7 +52,7 @@ impl <'a> From<&'a ast::ReturnTypeKind> for Type {
 pub struct Func {
     pub span: Span,
     pub decl: FuncDecl,
-    pub body: LinkedList<Node>
+    pub body: Vec<Node>
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -112,8 +112,8 @@ pub enum Instruction {
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Node {
-    span: Span,
-    instruction: Instruction,
+    pub span: Span,
+    pub instruction: Instruction,
 }
 
 impl Node {
@@ -162,7 +162,7 @@ impl TypeTable {
 
 }
 
-struct Convert {}
+pub struct Convert {}
 
 impl Convert {
 
@@ -217,7 +217,7 @@ impl Convert {
                         params,
                     };
 
-                    let flow = Convert::convert_stmts(
+                    let mut flow = Convert::convert_stmts(
                         &body.stmt,
                         &mut type_table,
                         &decl.return_type)?;
@@ -225,10 +225,20 @@ impl Convert {
 
                     type_table.drop_scope();
 
+                    let mut body_vec: Vec<Node> = vec![];
+
+                    loop {
+                        let node = flow.pop_front();
+                        match node {
+                            Some(n) => body_vec.push(n),
+                            None => break
+                        };
+                    }
+
                     let func = Func {
                         span: body.span.clone(),
                         decl: decl,
-                        body: flow
+                        body: body_vec
                     };
 
                     table.insert(name, func);
