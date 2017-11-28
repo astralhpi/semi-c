@@ -52,7 +52,7 @@ pub struct Runtime {
     memory: Memory,
     program_stack: Vec<(String, usize)>,
     var_table: VarTable,
-    stdout: String,
+    pub stdout: String,
 }
 
 
@@ -323,117 +323,125 @@ impl Runtime {
 
 }
 
-fn run_test(code: &str) -> String {
-    let meta = MetaData::new(code.to_string());
-    let ast = parse(&meta).unwrap();
-    let func_table = Convert::convert_program(&ast).unwrap();
-    print!("{:?}\n", func_table);
-    let mut runtime = Runtime::new(meta, func_table);
-    runtime.run().unwrap();
-    runtime.stdout.clone()
-}
-#[test]
-fn hello_world() {
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn run_test(code: &str) -> String {
+        let meta = MetaData::new(code.to_string());
+        let ast = parse(&meta).unwrap();
+        let func_table = Convert::convert_program(&ast).unwrap();
+        print!("{:?}\n", func_table);
+        let mut runtime = Runtime::new(meta, func_table);
+        runtime.run().unwrap();
+        runtime.stdout.clone()
+    }
+
+    #[test]
+    fn hello_world() {
+        let code = r#"
+        int main(void) {
+            printf("Hello World!\n");
+        }"#;
+        assert_eq!(run_test(code), "Hello World!\n");
+    }
+    #[test]
+    fn simple_format() {
+        let code = r#"
+            int main(void) {
+                printf("%d\n", 12313);
+                printf("%f\n", 45.0);
+                printf("%c\n", 'a');
+            }
+            "#;
+        assert_eq!(run_test(code), "12313\n45.0000\na\n");
+    }
+
+    // BONUS
+    #[test]
+    fn bonus_format() {
+        let code = r#"
+            int main(void) {
+                printf("Hello %s\n", "World!");
+            }
+            "#;
+        assert_eq!(run_test(code), "Hello World!\n");
+
+    }
+    #[test]
+    fn simple_int_calc() {
+        let code = r#"
+            int sub(int a, int b) {
+                return a - b;
+            }
+            int add(int c, int d) {
+                return c + d;
+            }
+            int mul(int e, int f) {
+                return e * f;
+            }
+            int div(int g, int f) {
+                return g / f;
+            }
+            int main(void) {
+                printf("%d\n", sub(102, 32));
+                printf("%d\n", sub(33, 132));
+                printf("%d\n", add(33, 44));
+                printf("%d\n", add(33, -44));
+                printf("%d\n", mul(25, 4));
+                printf("%d\n", mul(-5, 20));
+                printf("%d\n", div(25, 5));
+                printf("%d\n", div(123, -123));
+            }"#;
+        assert_eq!(run_test(code), indoc!("
+            70
+            -99
+            77
+            -11
+            100
+            -100
+            5
+            -1
+            "));
+    }
+
+    #[test]
+    fn simple_float_calc() {
     let code = r#"
-int main(void) {
-    printf("Hello World!\n");
-}"#;
-    assert_eq!(run_test(code), "Hello World!\n");
-}
-#[test]
-fn simple_format() {
-    let code = r#"
-int main(void) {
-    printf("%d\n", 12313);
-    printf("%f\n", 45.0);
-    printf("%c\n", 'a');
-}
-"#;
-    assert_eq!(run_test(code), "12313\n45.0000\na\n");
-
-}
-
-// BONUS
-#[test]
-fn bonus_format() {
-    let code = r#"
-int main(void) {
-    printf("Hello %s\n", "World!");
-}
-"#;
-    assert_eq!(run_test(code), "Hello World!\n");
-
-}
-#[test]
-fn simple_int_calc() {
-let code = r#"
-int sub(int a, int b) {
-    return a - b;
-}
-int add(int c, int d) {
-    return c + d;
-}
-int mul(int e, int f) {
-    return e * f;
-}
-int div(int g, int f) {
-    return g / f;
-}
-int main(void) {
-    printf("%d\n", sub(102, 32));
-    printf("%d\n", sub(33, 132));
-    printf("%d\n", add(33, 44));
-    printf("%d\n", add(33, -44));
-    printf("%d\n", mul(25, 4));
-    printf("%d\n", mul(-5, 20));
-    printf("%d\n", div(25, 5));
-    printf("%d\n", div(123, -123));
-}"#;
-    assert_eq!(run_test(code), r#"70
--99
-77
--11
-100
--100
-5
--1
-"#);
+    float sub(float a, float b) {
+        return a - b;
+    }
+    float add(float c, float d) {
+        return c + d;
+    }
+    float mul(float e, float f) {
+        return e * f;
+    }
+    float div(float g, float f) {
+        return g / f;
+    }
+    int main(void) {
+        printf("%f\n", sub(102, 32));
+        printf("%f\n", sub(33, 132));
+        printf("%f\n", add(33, 44));
+        printf("%f\n", add(33, -44));
+        printf("%f\n", mul(25, 4));
+        printf("%f\n", mul(-5, 20));
+        printf("%f\n", div(1, 5));
+        printf("%f\n", div(50, -100));
+    }"#;
+        assert_eq!(run_test(code), indoc!("
+        70.0000
+        -99.0000
+        77.0000
+        -11.0000
+        100.0000
+        -100.0000
+        0.2000
+        -0.5000
+        "));
 }
 
-#[test]
-fn simple_float_calc() {
-let code = r#"
-float sub(float a, float b) {
-    return a - b;
-}
-float add(float c, float d) {
-    return c + d;
-}
-float mul(float e, float f) {
-    return e * f;
-}
-float div(float g, float f) {
-    return g / f;
-}
-int main(void) {
-    printf("%f\n", sub(102, 32));
-    printf("%f\n", sub(33, 132));
-    printf("%f\n", add(33, 44));
-    printf("%f\n", add(33, -44));
-    printf("%f\n", mul(25, 4));
-    printf("%f\n", mul(-5, 20));
-    printf("%f\n", div(1, 5));
-    printf("%f\n", div(50, -100));
-}"#;
-    assert_eq!(run_test(code), r#"70.0000
--99.0000
-77.0000
--11.0000
-100.0000
--100.0000
-0.2000
--0.5000
-"#);
 }
 
 

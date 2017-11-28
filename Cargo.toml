@@ -4,6 +4,7 @@ name = "semi-c"
 version = "0.1.0"
 
 [dependencies]
+indoc = "0.2.3"
 lalrpop-util = "0.13.1"
 
 [dependencies.parser]
