@@ -423,7 +423,10 @@ impl Convert {
 
                 left_flow.append(&mut right_flow);
 
-                Ok((left_flow, target_type.clone()))
+                let (mut op, t) = Convert::convert_bin_op(bin_op, &target_type)?;
+                left_flow.append(&mut op);
+
+                Ok((left_flow, t))
             },
             &ast::ExprKind::Id(ref id) => {
                 match type_table.get(&id.node) {
