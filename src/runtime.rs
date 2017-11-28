@@ -4,6 +4,9 @@ use helper::parse;
 use meta_data::MetaData;
 use symbol_table::SymbolTable;
 use error::Error;
+use register::Register;
+use memory::Memory;
+use printf::Printf;
 
 type History = Vec<(usize, Option<String>)>;
 type VarTable = SymbolTable<String, (usize, History)>;
@@ -33,77 +36,6 @@ impl VarTable {
             }
         }
 
-    }
-}
-
-pub struct Memory {
-    memory: Vec<u8>,
-    stack_pointer: Vec<usize>
-}
-
-impl Memory {
-    pub fn new() -> Memory {
-        Memory {
-            memory: Vec::new(),
-            stack_pointer: Vec::new()
-        }
-    }
-    pub fn push_scope(&mut self) {
-        let len = self.stack_pointer.len();
-        let last = if len == 0 {
-            0
-        } else {
-            self.stack_pointer[len - 1]
-        };
-        self.stack_pointer.push(last);
-    }
-
-    pub fn drop_scope(&mut self) {
-        self.stack_pointer.pop();
-    }
-
-    pub fn alloc_stack(&mut self, size: usize) -> Result<usize, Error> {
-        let address = self.stack_pointer.pop().ok_or(
-            Error::Runtime("no stack".to_string()))?;
-        let end_addr = address + size;
-        self.stack_pointer.push(end_addr);
-        while self.memory.len() < end_addr{
-            self.memory.push(0);
-        }
-        Ok(address)
-    }
-    pub fn load_bytes(&mut self, addr: usize, bytes: Vec<u8>) {
-        for (i, byte) in bytes.iter().enumerate() {
-            self.memory[i + addr] = *byte;
-        }
-    }
-    pub fn get_bytes(&self, addr: usize, size: usize) -> &[u8] {
-        &self.memory[addr..addr+size]
-    }
-    pub fn get_byte(&self, addr: usize) -> u8 {
-        self.memory[addr]
-    }
-
-    pub fn load_register(&mut self, addr: usize, register:&Register) {
-        unsafe {
-            for i in 0..4 {
-                self.memory[addr + i] = register.bytes[i];
-            }
-        }
-    }
-    pub fn get_register(&self, addr: usize) -> Register {
-        let bytes:[u8; 4] = [
-            self.memory[addr],
-            self.memory[addr+1],
-            self.memory[addr+2],
-            self.memory[addr+3],
-        ];
-        Register {
-            bytes
-        }
-    }
-    pub fn is_allocated(&self, addr: usize) -> bool{
-        addr < self.memory.len()
     }
 }
 
@@ -391,142 +323,6 @@ impl Runtime {
 
 }
 
-struct Printf {}
-
-impl Printf {
-    fn printf(args: &[Register], memory:&Memory) -> Option<String>{
-        let mut args_stack : Vec<_> = args.iter().collect();
-        args_stack.reverse();
-        let format = args_stack.pop();
-        match format {
-            Some(ref r) => unsafe {
-                let addr = r.addr;
-                match Printf::load_str(addr, memory) {
-                    None => None,
-                    Some(fmt) => Printf::format(&fmt, &mut args_stack, memory)
-                }
-            },
-            None => None
-        }
-    }
-    fn format(fmt: &str, args_stack: &mut Vec<&Register>, memory:&Memory)
-            -> Option<String> {
-        let mut buffer = String::new();
-        let mut is_format = false;
-        for c in fmt.chars() {
-            if (is_format) {
-                let r = args_stack.pop();
-                match r {
-                    None => return None,
-                    Some(ref r) => unsafe {
-                        match c {
-                            'd' => buffer.push_str(&format!("{}", r.int)),
-                            'f' => buffer.push_str(&format!("{:.4}", r.float)),
-                            'c' => buffer.push(r.ch),
-                            's' => match Printf::load_str(r.addr, memory) {
-                                None => return None,
-                                Some(ref s) => buffer.push_str(s),
-                            },
-                            _ => return None,
-
-                        };
-                    }
-                }
-                is_format = false;
-            } else if (c == '%'){
-                is_format = true;
-            } else {
-                buffer.push(c);
-            }
-        }
-        Some(buffer)
-
-    }
-    fn load_str(addr: u32, memory:&Memory) -> Option<String> {
-        let mut data: Vec<u8> = vec![];
-        let mut addr = addr;
-        loop {
-            if !memory.is_allocated(addr as usize) {
-                return None;
-            }
-            let byte = memory.get_byte(addr as usize);
-            if byte == 0 {
-                break;
-            }
-            data.push(byte);
-            addr += 1;
-        }
-        String::from_utf8(data).ok()
-
-    }
-}
-
-
-
-#[repr(C)]
-union Register {
-    addr: u32,
-    int: i32,
-    float: f32,
-    ch: char,
-    bytes: [u8; 4]
-}
-
-impl <'a> From<&'a [u8]> for Register {
-    fn from(data:&[u8]) -> Register{
-        let bytes: [u8; 4] = [data[0], data[1], data[2], data[3]];
-        Register { bytes }
-
-    }
-
-}
-
-impl Register {
-    fn load_bytes(&mut self, bytes:&[u8]) {
-        unsafe {
-            for i in 0..4 {
-                self.bytes[i] = bytes[i];
-            }
-
-        }
-    }
-}
-
-#[test]
-fn test_register() {
-    let mut r = Register { int: 32 };
-    unsafe {
-        assert_eq!(32, r.bytes[0]);
-        assert_eq!(0, r.bytes[1]);
-        assert_eq!(0, r.bytes[2]);
-        assert_eq!(0, r.bytes[3]);
-
-        r.int = 0xFFFF;
-        assert_eq!(0xFF, r.bytes[0]);
-        assert_eq!(0xFF, r.bytes[1]);
-        assert_eq!(0, r.bytes[2]);
-        assert_eq!(0, r.bytes[3]);
-
-        r.int = 5;
-        assert_eq!(5, r.bytes[0]);
-        assert_eq!(0, r.bytes[1]);
-        assert_eq!(0, r.bytes[2]);
-        assert_eq!(0, r.bytes[3]);
-
-        r.bytes = [0xFF, 0, 0, 0];
-        assert_eq!(0xFF, r.int);
-
-        r.int = -100;
-        assert_eq!(156, r.bytes[0]);
-        assert_eq!(255, r.bytes[1]);
-        assert_eq!(255, r.bytes[2]);
-        assert_eq!(255, r.bytes[3]);
-
-        r.bytes = [156, 255, 255, 255];
-        assert_eq!(-100, r.int);
-    }
-
-}
 fn run_test(code: &str) -> String {
     let meta = MetaData::new(code.to_string());
     let ast = parse(&meta).unwrap();

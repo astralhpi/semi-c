@@ -7,6 +7,9 @@ mod symbol_table;
 mod flow_graph;
 mod helper;
 mod runtime;
+mod memory;
+mod register;
+mod printf;
 
 use meta_data::MetaData;
 use helper::{read, parse};
