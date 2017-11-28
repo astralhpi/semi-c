@@ -73,6 +73,7 @@ pub enum Instruction {
     LoadString(String),
     LoadChar(char),
     LoadInt(i32),
+    LoadFloat(f32),
 
     // load variable
     LoadVar(String),
@@ -403,6 +404,12 @@ impl Convert {
                                 lit.span.clone(),
                                 Instruction::LoadInt(*i)));
                         Ok((flow, Type::Int))
+                    },
+                    &ast::LitKind::Float(ref f) => {
+                        flow.push_back(Node::new(
+                                lit.span.clone(),
+                                Instruction::LoadFloat(*f)));
+                        Ok((flow, Type::Float))
                     },
                 }
             },

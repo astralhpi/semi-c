@@ -25,7 +25,7 @@ pub Lit: ast::Lit = {
         create_lit_char(l, r, '\n'),
     <l:@L> <c:r"'\\0'"> <r:@R> =>
         create_lit_char(l, r, '\0'),
-    <l:@L> <s:r#""[\P{Cc}]*""#> <r:@R> => {
+    <l:@L> <s:r#""[^"]*""#> <r:@R> => {
         let s = s[1..s.len()-1].to_string().replace("\\n", "\n");
         create_lit_string(l, r, s)
     }

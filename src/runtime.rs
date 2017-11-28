@@ -173,7 +173,15 @@ impl Runtime {
                         self.program_stack.push((func_name, index+1));
                     },
                     &Instruction::LoadInt(i) => {
-                        self.register_stack.push(Register {int:i});
+                        self.register_stack.push(Register {int: i});
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::LoadFloat(f) => {
+                        self.register_stack.push(Register {float: f});
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::LoadChar(c) => {
+                        self.register_stack.push(Register {ch: c});
                         self.program_stack.push((func_name, index+1));
                     },
                     &Instruction::LoadVar(ref var_name) => {
@@ -263,16 +271,52 @@ struct Printf {}
 
 impl Printf {
     fn printf(args: &[Register], memory:&Memory) -> Option<String>{
-        let mut args = args.iter();
-        let format = args.next();
+        let mut args_stack : Vec<_> = args.iter().collect();
+        args_stack.reverse();
+        let format = args_stack.pop();
         match format {
             Some(ref r) => unsafe {
                 let addr = r.addr;
-                let s = Printf::load_str(addr, memory);
-                s
+                match Printf::load_str(addr, memory) {
+                    None => None,
+                    Some(fmt) => Printf::format(&fmt, &mut args_stack, memory)
+                }
             },
             None => None
         }
+    }
+    fn format(fmt: &str, args_stack: &mut Vec<&Register>, memory:&Memory)
+            -> Option<String> {
+        let mut buffer = String::new();
+        let mut is_format = false;
+        for c in fmt.chars() {
+            if (is_format) {
+                let r = args_stack.pop();
+                match r {
+                    None => return None,
+                    Some(ref r) => unsafe {
+                        match c {
+                            'd' => buffer.push_str(&format!("{}", r.int)),
+                            'f' => buffer.push_str(&format!("{:.4}", r.float)),
+                            'c' => buffer.push(r.ch),
+                            's' => match Printf::load_str(r.addr, memory) {
+                                None => return None,
+                                Some(ref s) => buffer.push_str(s),
+                            },
+                            _ => return None,
+
+                        };
+                    }
+                }
+                is_format = false;
+            } else if (c == '%'){
+                is_format = true;
+            } else {
+                buffer.push(c);
+            }
+        }
+        Some(buffer)
+
     }
     fn load_str(addr: u32, memory:&Memory) -> Option<String> {
         let mut data: Vec<u8> = vec![];
@@ -300,6 +344,7 @@ union Register {
     addr: u32,
     int: i32,
     float: f32,
+    ch: char,
     bytes: [u8; 4]
 }
 
@@ -358,21 +403,47 @@ fn test_register() {
     }
 
 }
-#[test]
-fn hello_world() {
-let code = r#"
-
-int main(void) {
-    printf("Hello World!");
-}"#;
+fn run_test(code: &str) -> String {
     let meta = MetaData::new(code.to_string());
     let ast = parse(&meta).unwrap();
     let func_table = Convert::convert_program(&ast).unwrap();
+    print!("{:?}", func_table);
     let mut runtime = Runtime::new(meta, func_table);
     runtime.run().unwrap();
-    assert_eq!(runtime.stdout, "Hello World!");
+    runtime.stdout.clone()
+}
+#[test]
+fn hello_world() {
+    let code = r#"
+int main(void) {
+    printf("Hello World!\n");
+}"#;
+    assert_eq!(run_test(code), "Hello World!\n");
+}
+#[test]
+fn simple_format() {
+    let code = r#"
+int main(void) {
+    printf("%d\n", 12313);
+    printf("%f\n", 45.0);
+    printf("%c\n", 'a');
+}
+"#;
+    assert_eq!(run_test(code), "12313\n45.0000\na\n");
+
 }
 
+// BONUS
+#[test]
+fn bonus_format() {
+    let code = r#"
+int main(void) {
+    printf("Hello %s\n", "World!");
+}
+"#;
+    assert_eq!(run_test(code), "Hello World!\n");
+
+}
 //#[test]
 //fn simple_calc() {
 //let code = r#"
