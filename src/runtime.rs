@@ -407,39 +407,39 @@ mod tests {
 
     #[test]
     fn simple_float_calc() {
-    let code = r#"
-    float sub(float a, float b) {
-        return a - b;
-    }
-    float add(float c, float d) {
-        return c + d;
-    }
-    float mul(float e, float f) {
-        return e * f;
-    }
-    float div(float g, float f) {
-        return g / f;
-    }
-    int main(void) {
-        printf("%f\n", sub(102, 32));
-        printf("%f\n", sub(33, 132));
-        printf("%f\n", add(33, 44));
-        printf("%f\n", add(33, -44));
-        printf("%f\n", mul(25, 4));
-        printf("%f\n", mul(-5, 20));
-        printf("%f\n", div(1, 5));
-        printf("%f\n", div(50, -100));
-    }"#;
+        let code = r#"
+            float sub(float a, float b) {
+                return a - b;
+            }
+            float add(float c, float d) {
+                return c + d;
+            }
+            float mul(float e, float f) {
+                return e * f;
+            }
+            float div(float g, float f) {
+                return g / f;
+            }
+            int main(void) {
+                printf("%f\n", sub(102, 32));
+                printf("%f\n", sub(33, 132));
+                printf("%f\n", add(33, 44));
+                printf("%f\n", add(33, -44));
+                printf("%f\n", mul(25, 4));
+                printf("%f\n", mul(-5, 20));
+                printf("%f\n", div(1, 5));
+                printf("%f\n", div(50, -100));
+            }"#;
         assert_eq!(run_test(code), indoc!("
-        70.0000
-        -99.0000
-        77.0000
-        -11.0000
-        100.0000
-        -100.0000
-        0.2000
-        -0.5000
-        "));
+            70.0000
+            -99.0000
+            77.0000
+            -11.0000
+            100.0000
+            -100.0000
+            0.2000
+            -0.5000
+            "));
 }
 
 }
