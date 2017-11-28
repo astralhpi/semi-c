@@ -32,8 +32,8 @@ fn lit() {
         semic::parse_Lit("\"hello\"").unwrap(),
         create_lit_string(0, 7, "hello".to_string()));
     assert_eq!(
-        semic::parse_Lit("\"hello\nworld\"").unwrap(),
-        create_lit_string(0, 13, "hello\nworld".to_string()));
+        semic::parse_Lit("\"hello\\nworld\"").unwrap(),
+        create_lit_string(0, 14, "hello\nworld".to_string()));
 }
 
 
