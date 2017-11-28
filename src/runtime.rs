@@ -301,7 +301,78 @@ impl Runtime {
                         }
                         self.register_stack.push(operand);
                         self.program_stack.push((func_name, index+1));
-                    }
+                    },
+                    &Instruction::Subf => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let val = left.float - right.float;
+                            self.register_stack.push(Register {float: val});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Addf => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let val = left.float + right.float;
+                            self.register_stack.push(Register {float: val});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Mulf => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let val = left.float * right.float;
+                            self.register_stack.push(Register {float: val});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Divf => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let val = left.float / right.float;
+                            self.register_stack.push(Register {float: val});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Minusf => {
+                        let mut operand = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            operand.float = - operand.float;
+                        }
+                        self.register_stack.push(operand);
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::CharToInt => {
+                        let mut operand = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            operand.int = operand.bytes[0] as i32;
+                        }
+                        self.register_stack.push(operand);
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::IntToFloat => {
+                        let mut operand = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            operand.float = operand.int as f32;
+                        }
+                        self.register_stack.push(operand);
+                        self.program_stack.push((func_name, index+1));
+                    },
                     _ => {
                         return Err(Error::NotImplementedRuntime(
                                 format!("{:?}", n),
@@ -498,7 +569,7 @@ int main(void) {
 
 }
 #[test]
-fn simple_calc() {
+fn simple_int_calc() {
 let code = r#"
 int sub(int a, int b) {
     return a - b;
@@ -530,5 +601,43 @@ int main(void) {
 -100
 5
 -1
-"#)
+"#);
 }
+
+#[test]
+fn simple_float_calc() {
+let code = r#"
+float sub(float a, float b) {
+    return a - b;
+}
+float add(float c, float d) {
+    return c + d;
+}
+float mul(float e, float f) {
+    return e * f;
+}
+float div(float g, float f) {
+    return g / f;
+}
+int main(void) {
+    printf("%f\n", sub(102, 32));
+    printf("%f\n", sub(33, 132));
+    printf("%f\n", add(33, 44));
+    printf("%f\n", add(33, -44));
+    printf("%f\n", mul(25, 4));
+    printf("%f\n", mul(-5, 20));
+    printf("%f\n", div(1, 5));
+    printf("%f\n", div(50, -100));
+}"#;
+    assert_eq!(run_test(code), r#"70.0000
+-99.0000
+77.0000
+-11.0000
+100.0000
+-100.0000
+0.2000
+-0.5000
+"#);
+}
+
+
