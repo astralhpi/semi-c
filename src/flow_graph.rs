@@ -84,7 +84,8 @@ pub enum Instruction {
 
     // unary op
     Not,
-    Minus,
+    Minusi,
+    Minusf,
     
     // bin op
     Addi,
@@ -418,7 +419,7 @@ impl Convert {
                     left, type_table)?;
                 let (mut right_flow, right_type) = Convert::convert_expr(
                     right, type_table)?;
-                let target_type = Convert::target_type(&left_type,
+                let target_type = Convert::target_type_bin(&left_type,
                                                        &right_type,
                                                        &bin_op.node);
                 left_flow.append(
@@ -455,6 +456,26 @@ impl Convert {
                     id.node.to_string(), exprs, &expr.span, type_table)
 
             },
+            &ast::ExprKind::Minus(ref operand) => {
+                let (mut flow, t) = Convert::convert_expr(operand, type_table)?;
+                let target = Convert::target_type_minus(&t);
+                flow.append(&mut Convert::auto_type_cast(
+                        &t,
+                        &target,
+                        &expr.span)?);
+                let instruction = match target {
+                    Type::Int => Ok(Instruction::Minusi),
+                    Type::Float => Ok(Instruction::Minusf),
+                    _ => Err(Error::TypeError(expr.span.clone())),
+                }?;
+
+                flow.push_back(Node {
+                    span: expr.span.clone(),
+                    instruction
+                });
+                Ok((flow, target))
+
+            }
             _ => {
                 Err(Error::NotImplementedSyntax(expr.span.clone()))
             }
@@ -728,7 +749,15 @@ impl Convert {
         }
     }
 
-    pub fn target_type<'a>(
+    pub fn target_type_minus(t:&Type) -> Type {
+        match t {
+            &Type::Int => Type::Int,
+            &Type::Float => Type::Float,
+            _ => Type::Int,
+        }
+    }
+
+    pub fn target_type_bin<'a>(
             t1:&'a Type, t2:&'a Type, op: &ast::BinOpKind) -> &'a Type {
         match op {
             &ast::BinOpKind::Add | &ast::BinOpKind::Sub |

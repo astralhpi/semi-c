@@ -249,6 +249,59 @@ impl Runtime {
                         self.program_stack.push((func_name, index+1));
 
                     },
+                    &Instruction::Subi => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let val = left.int - right.int;
+                            self.register_stack.push(Register {int: val});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Addi => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let val = left.int + right.int;
+                            self.register_stack.push(Register {int: val});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Muli => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let val = left.int * right.int;
+                            self.register_stack.push(Register {int: val});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Divi => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let val = left.int / right.int;
+                            self.register_stack.push(Register {int: val});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Minusi => {
+                        let mut operand = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            operand.int = - operand.int;
+                        }
+                        self.register_stack.push(operand);
+                        self.program_stack.push((func_name, index+1));
+                    }
                     _ => {
                         return Err(Error::NotImplementedRuntime(
                                 format!("{:?}", n),
@@ -407,7 +460,7 @@ fn run_test(code: &str) -> String {
     let meta = MetaData::new(code.to_string());
     let ast = parse(&meta).unwrap();
     let func_table = Convert::convert_program(&ast).unwrap();
-    print!("{:?}", func_table);
+    print!("{:?}\n", func_table);
     let mut runtime = Runtime::new(meta, func_table);
     runtime.run().unwrap();
     runtime.stdout.clone()
@@ -444,21 +497,38 @@ int main(void) {
     assert_eq!(run_test(code), "Hello World!\n");
 
 }
-//#[test]
-//fn simple_calc() {
-//let code = r#"
-//int sub(int a, int b) {
-//    return a - b;
-//}
-//int main(void) {
-//    printf("a
-//", sub(1, 2));
-//}"#;
-//    let meta = MetaData::new(code.to_string());
-//    let ast = parse(&meta).unwrap();
-//    let func_table = Convert::convert_program(&ast).unwrap();
-//    print!("{:?}", func_table);
-//    let mut runtime = Runtime::new(meta, func_table);
-//    runtime.run().unwrap();
-//    assert!(false);
-//}
+#[test]
+fn simple_calc() {
+let code = r#"
+int sub(int a, int b) {
+    return a - b;
+}
+int add(int c, int d) {
+    return c + d;
+}
+int mul(int e, int f) {
+    return e * f;
+}
+int div(int g, int f) {
+    return g / f;
+}
+int main(void) {
+    printf("%d\n", sub(102, 32));
+    printf("%d\n", sub(33, 132));
+    printf("%d\n", add(33, 44));
+    printf("%d\n", add(33, -44));
+    printf("%d\n", mul(25, 4));
+    printf("%d\n", mul(-5, 20));
+    printf("%d\n", div(25, 5));
+    printf("%d\n", div(123, -123));
+}"#;
+    assert_eq!(run_test(code), r#"70
+-99
+77
+-11
+100
+-100
+5
+-1
+"#)
+}
