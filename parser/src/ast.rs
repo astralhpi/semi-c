@@ -91,9 +91,12 @@ pub struct Assg {
 #[derive(Debug, PartialEq)]
 pub enum AssgKind {
     // id[expr] = expr
-    Assign(Id, Option<Box<Expr>>, Box<Expr>),
+    Assign(Id, Box<Expr>),
+    AssignArray(Id, Box<Expr>, Box<Expr>),
     Inc(Id),
-    Dec(Id)
+    Dec(Id),
+    PostInc(Id),
+    PostDec(Id)
 }
 
 #[derive(Debug, PartialEq)]

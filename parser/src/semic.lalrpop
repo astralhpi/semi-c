@@ -251,18 +251,26 @@ pub Unmatched: ast::Stmt = {
 pub Assg: ast::Assg = {
     <l:@L> <id:Id> "=" <expr:Expr> <r:@R> => ast::Assg {
         span: Span::new(l, r),
-        node: ast::AssgKind::Assign(id, Option::None, Box::new(expr))
+        node: ast::AssgKind::Assign(id, Box::new(expr))
     },
     <l:@L> <id:Id> "[" <expr1:Expr> "]" "=" <expr2:Expr> <r:@R> => ast::Assg {
         span: Span::new(l, r),
-        node: ast::AssgKind::Assign(
-            id, Option::Some(Box::new(expr1)), Box::new(expr2))
+        node: ast::AssgKind::AssignArray(
+            id, Box::new(expr1), Box::new(expr2))
     },
     <l:@L> <id:Id> "++" <r:@R> => ast::Assg {
         span: Span::new(l, r),
-        node: ast::AssgKind::Inc(id)
+        node: ast::AssgKind::PostInc(id)
     },
     <l:@L> <id:Id> "--" <r:@R> => ast::Assg {
+        span: Span::new(l, r),
+        node: ast::AssgKind::PostInc(id)
+    },
+    <l:@L> "++" <id:Id> <r:@R> => ast::Assg {
+        span: Span::new(l, r),
+        node: ast::AssgKind::Inc(id)
+    },
+    <l:@L> "--" <id:Id> <r:@R> => ast::Assg {
         span: Span::new(l, r),
         node: ast::AssgKind::Inc(id)
     },
