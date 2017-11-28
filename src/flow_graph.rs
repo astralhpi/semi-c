@@ -81,6 +81,7 @@ pub enum Instruction {
     // convert
     CharToInt,
     IntToFloat,
+    FloatToInt,
 
     // unary op
     Not,
@@ -743,6 +744,13 @@ impl Convert {
                         instruction: Instruction::IntToFloat
                     });
                 },
+                (&Type::Float, &Type::Int) => {
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::FloatToInt
+                    });
+
+                }
                 (_, _) => return Err(Error::TypeError(span.clone())),
             };
             Ok(result)

@@ -12,28 +12,32 @@ use std::io::prelude::*;
 pub fn parse(meta: &MetaData) -> Result<parser::ast::Program, String> {
     match parser::semic::parse_Prog(&meta.code) {
         Ok(ast) => Result::Ok(ast),
-        Err(e) => match e {
-            UnrecognizedToken {token, expected} => {
-                let _expected = expected;
-                match token {
-                    Option::None => Result::Err(
-                        format!(
-                            "Syntax error : line {}",
-                            meta.line_count())),
-                    Option::Some((l, _, _)) => {
-                        syntax_error(meta, l)
+        Err(e) => {
+            print!("{:?}", e);
+
+            match e {
+                UnrecognizedToken {token, expected} => {
+                    let _expected = expected;
+                    match token {
+                        Option::None => Result::Err(
+                            format!(
+                                "Syntax error : line {}",
+                                meta.line_count())),
+                        Option::Some((l, _, _)) => {
+                            syntax_error(meta, l)
+                        }
                     }
-                }
-            },
-            InvalidToken {location} => {
-                syntax_error(meta, location)
-            },
-            ExtraToken {token} => {
-                let (left, _, _) = token;
-                let (line, _) = meta.line_column(left);
-                syntax_error(meta, line)
-            },
-            _ => panic!("wtf")
+                },
+                InvalidToken {location} => {
+                    syntax_error(meta, location)
+                },
+                ExtraToken {token} => {
+                    let (left, _, _) = token;
+                    let (line, _) = meta.line_column(left);
+                    syntax_error(meta, line)
+                },
+                _ => panic!("wtf")
+            }
         }
     }
 }

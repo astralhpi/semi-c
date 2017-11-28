@@ -35,7 +35,6 @@ impl VarTable {
                 Some(*addr)
             }
         }
-
     }
 }
 
@@ -142,8 +141,7 @@ impl Runtime {
                             self.var_table.declare_var(
                                 var_name.to_string(),
                                 addr,
-                                self.meta.line(n.span.lo));
-
+                                self.meta.line(func.span.lo));
                         }
 
                         self.program_stack.push((func_name, index+1));
@@ -305,6 +303,15 @@ impl Runtime {
                         self.register_stack.push(operand);
                         self.program_stack.push((func_name, index+1));
                     },
+                    &Instruction::FloatToInt=> {
+                        let mut operand = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            operand.int = operand.float as i32;
+                        }
+                        self.register_stack.push(operand);
+                        self.program_stack.push((func_name, index+1));
+                    },
                     _ => {
                         return Err(Error::NotImplementedRuntime(
                                 format!("{:?}", n),
@@ -440,7 +447,25 @@ mod tests {
             0.2000
             -0.5000
             "));
-}
+    }
+
+    #[test]
+    fn simple_for() {
+        let code = r#"
+            int main(void) {
+                int i=0, sum=0;
+
+                for(i=0; i<10; i++) {
+                    sum = sum + i;
+                }
+
+                printf("%d", sum);
+
+            }
+            "#;
+        assert_eq!(run_test(code), "55");
+
+    }
 
 }
 
