@@ -36,6 +36,17 @@ impl VarTable {
             }
         }
     }
+
+    fn update_var(&mut self, name: &String, value:String, line: usize){
+        match self.get_mut(name) {
+            None => {},
+            Some(mut v) => {
+                let (_, ref mut history) = *v;
+                history.push((line, Some(value)));
+            }
+        };
+    }
+
 }
 
 #[derive(Debug)]
@@ -132,15 +143,20 @@ impl Runtime {
 
                         for i in 0..args_size {
                             let addr = self.memory.alloc_stack(4)?;
-                            let (_, ref var_name) = *params.pop().ok_or(
+                            let (ref t, ref var_name) = *params.pop().ok_or(
                                 Error::Runtime("call error".to_string()))?;
+                            let r = self.register_stack.pop().ok_or(
+                                    Error::Runtime("no register".to_string()))?;
                             self.memory.load_register(
                                 addr,
-                                &self.register_stack.pop().ok_or(
-                                    Error::Runtime("no register".to_string()))?);
+                                &r);
                             self.var_table.declare_var(
                                 var_name.to_string(),
                                 addr,
+                                self.meta.line(func.span.lo));
+                            self.var_table.update_var(
+                                var_name,
+                                r.stringify(t),
                                 self.meta.line(func.span.lo));
                         }
 

@@ -47,10 +47,27 @@ impl<K: Hash + Eq, V> SymbolTable<K, V> {
                 None => depth -= 1,
             }
         }
-
         Option::None
     }
 
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        match self.get_mut_with_depth(key) {
+            None => Option::None,
+            Some((mut value, _)) => Option::Some(value)
+        }
+
+    }
+
+    pub fn get_mut_with_depth(&mut self, key: &K) -> Option<(&mut V, usize)> {
+        let mut depth = self.list.len();
+        for table in &mut self.list {
+            match table.get_mut(key) {
+                Some(mut v) => return Some((v, depth)),
+                None => depth -= 1,
+            }
+        }
+        Option::None
+    }
     pub fn depth(&self) -> usize {
         self.list.len()
     }

@@ -1,4 +1,5 @@
 use error::Error;
+use flow_graph::Type;
 
 #[repr(C)]
 pub union Register {
@@ -26,6 +27,18 @@ impl Register {
             }
 
         }
+    }
+    pub fn stringify(&self, t: &Type) -> String {
+        unsafe {
+            match t {
+                &Type::Int => format!("{}", self.int),
+                &Type::Char => format!("{}", self.bytes[0] as char),
+                &Type::Float => format!("{:.4}", self.float),
+                &Type::Pointer(_) => format!("{:#x}", self.addr),
+                _ => format!("N/A")
+            }
+        }
+
     }
 }
 
