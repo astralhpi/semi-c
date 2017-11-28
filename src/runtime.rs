@@ -80,6 +80,9 @@ impl Memory {
     pub fn get_bytes(&self, addr: usize, size: usize) -> &[u8] {
         &self.memory[addr..addr+size]
     }
+    pub fn get_byte(&self, addr: usize) -> u8 {
+        self.memory[addr]
+    }
 
     pub fn load_register(&mut self, addr: usize, register:&Register) {
         unsafe {
@@ -99,7 +102,9 @@ impl Memory {
             bytes
         }
     }
-
+    pub fn is_allocated(&self, addr: usize) -> bool{
+        addr < self.memory.len()
+    }
 }
 
 #[derive(Debug)]
@@ -115,6 +120,7 @@ pub struct Runtime {
     memory: Memory,
     program_stack: Vec<(String, usize)>,
     var_table: VarTable,
+    stdout: String,
 }
 
 
@@ -127,6 +133,7 @@ impl Runtime {
             memory: Memory::new(),
             program_stack: Vec::new(),
             var_table: VarTable::new(),
+            stdout: String::new()
         }
     }
     fn run(&mut self) -> Result<(), Error> {
@@ -145,8 +152,12 @@ impl Runtime {
         Ok(())
     }
     fn step(&mut self) -> Result<ProgramState, Error> {
-        let (func_name, index) = self.program_stack.pop()
-            .ok_or(Error::Runtime("no program pointer".to_string()))?;
+        if self.program_stack.len() == 0 {
+            assert_eq!(self.register_stack.len(), 1);
+            return Ok(ProgramState::End);
+        }
+
+        let (func_name, index) = self.program_stack.pop().unwrap();
         let func = self.flow_table.get(&func_name)
             .ok_or(Error::Runtime("not defined function".to_string()))?;
         let node = &func.body.get(index);
@@ -182,8 +193,8 @@ impl Runtime {
 
                         for i in 0..args_size {
                             let addr = self.memory.alloc_stack(4)?;
-                            let (_, ref var_name) = *params.pop()
-                                .ok_or(Error::Runtime("call error".to_string()))?;
+                            let (_, ref var_name) = *params.pop().ok_or(
+                                Error::Runtime("call error".to_string()))?;
                             self.memory.load_register(
                                 addr,
                                 &self.register_stack.pop().ok_or(
@@ -197,6 +208,38 @@ impl Runtime {
 
                         self.program_stack.push((func_name, index+1));
                         self.program_stack.push((name.to_string(), 0));
+                    },
+                    &Instruction::Return => {
+                        self.memory.drop_scope();
+                        self.var_table.drop_scope();
+                    },
+                    &Instruction::ReturnVoid => {
+                        self.register_stack.push(Register {int: 0});
+                        self.memory.drop_scope();
+                        self.var_table.drop_scope();
+                    },
+                    &Instruction::Printf { ref args_size } => {
+                        let len = self.register_stack.len();
+                        let regs: Vec<_> = self.register_stack.drain(
+                            len-args_size..).collect();
+                        match Printf::printf(&regs, &self.memory) {
+                            Some(s) => {
+                                self.stdout.push_str(&s);
+                                print!("{}", &s);
+                            },
+                            None => {
+                                return Err(Error::Runtime(
+                                        "print error".to_string()));
+                            }
+
+                        }
+                        self.register_stack.push(Register {int: 0});
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Pop => {
+                        self.register_stack.pop();
+                        self.program_stack.push((func_name, index+1));
+
                     },
                     _ => {
                         return Err(Error::NotImplementedRuntime(
@@ -214,6 +257,40 @@ impl Runtime {
         }
     }
 
+}
+
+struct Printf {}
+
+impl Printf {
+    fn printf(args: &[Register], memory:&Memory) -> Option<String>{
+        let mut args = args.iter();
+        let format = args.next();
+        match format {
+            Some(ref r) => unsafe {
+                let addr = r.addr;
+                let s = Printf::load_str(addr, memory);
+                s
+            },
+            None => None
+        }
+    }
+    fn load_str(addr: u32, memory:&Memory) -> Option<String> {
+        let mut data: Vec<u8> = vec![];
+        let mut addr = addr;
+        loop {
+            if !memory.is_allocated(addr as usize) {
+                return None;
+            }
+            let byte = memory.get_byte(addr as usize);
+            if byte == 0 {
+                break;
+            }
+            data.push(byte);
+            addr += 1;
+        }
+        String::from_utf8(data).ok()
+
+    }
 }
 
 
@@ -281,20 +358,36 @@ fn test_register() {
     }
 
 }
-
 #[test]
-fn simple_calc() {
+fn hello_world() {
 let code = r#"
-int add(int a, int b) {
-    return a + b;
-}
+
 int main(void) {
-    printf("%d", add(1, 2));
+    printf("Hello World!");
 }"#;
     let meta = MetaData::new(code.to_string());
     let ast = parse(&meta).unwrap();
     let func_table = Convert::convert_program(&ast).unwrap();
     let mut runtime = Runtime::new(meta, func_table);
     runtime.run().unwrap();
-    assert!(false);
+    assert_eq!(runtime.stdout, "Hello World!");
 }
+
+//#[test]
+//fn simple_calc() {
+//let code = r#"
+//int sub(int a, int b) {
+//    return a - b;
+//}
+//int main(void) {
+//    printf("a
+//", sub(1, 2));
+//}"#;
+//    let meta = MetaData::new(code.to_string());
+//    let ast = parse(&meta).unwrap();
+//    let func_table = Convert::convert_program(&ast).unwrap();
+//    print!("{:?}", func_table);
+//    let mut runtime = Runtime::new(meta, func_table);
+//    runtime.run().unwrap();
+//    assert!(false);
+//}
