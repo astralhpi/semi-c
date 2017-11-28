@@ -26,6 +26,12 @@ fn lit() {
         semic::parse_Lit("323").unwrap(),
         create_lit_int(0, 3, 323));
     assert_eq!(
+        semic::parse_Lit("3.23").unwrap(),
+        create_lit_float(0, 4, 3.23));
+    assert_eq!(
+        semic::parse_Lit(".23").unwrap(),
+        create_lit_float(0, 3, 0.23));
+    assert_eq!(
         semic::parse_Lit("\"\"").unwrap(),
         create_lit_string(0, 2,"".to_string()));
     assert_eq!(

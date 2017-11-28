@@ -17,6 +17,8 @@ pub Id: ast::Id = {
 pub Lit: ast::Lit = {
     <l:@L> <s:r"\d+"> <r:@R> =>
         create_lit_int(l, r, i32::from_str(s).unwrap()),
+    <l:@L> <s:r"\d*\.\d+"> <r:@R> =>
+        create_lit_float(l, r, f32::from_str(s).unwrap()),
     <l:@L> <c:r"'[\P{Cc}]'"> <r:@R> =>
         create_lit_char(l, r, c[1..].chars().next().unwrap()),
     <l:@L> <c:r"'\\n'"> <r:@R> =>

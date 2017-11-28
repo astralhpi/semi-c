@@ -55,6 +55,7 @@ pub type BinOp = Spanned<BinOpKind>;
 #[derive(Debug, PartialEq)]
 pub enum LitKind {
     Int(i32),
+    Float(f32),
     Char(char),
     String(String),
 }

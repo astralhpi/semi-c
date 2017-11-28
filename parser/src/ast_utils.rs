@@ -12,6 +12,9 @@ pub fn create_lit_int(l:usize, r:usize, i:i32) -> Lit {
     Lit::new(l, r, LitKind::Int(i))
 }
 
+pub fn create_lit_float(l:usize, r:usize, f:f32) -> Lit {
+    Lit::new(l, r, LitKind::Float(f))
+}
 pub fn create_expr_binary(
         l:usize, r:usize, l2:usize, r2:usize,
         bin_op:BinOpKind, left:Expr, right:Expr) -> Expr {
