@@ -71,7 +71,7 @@ pub struct Runtime {
 
 
 impl Runtime {
-    fn new(meta:MetaData, flow_table: HashMap<String, Func>) -> Runtime {
+    pub fn new(meta:MetaData, flow_table: HashMap<String, Func>) -> Runtime {
         Runtime {
             meta,
             flow_table,
@@ -82,7 +82,7 @@ impl Runtime {
             stdout: String::new()
         }
     }
-    fn run(&mut self) -> Result<(), Error> {
+    pub fn run(&mut self) -> Result<(), Error> {
         self.flow_table.get("main").ok_or(Error::NoMain)?;
         self.program_stack.clear();
         self.program_stack.push(("main".to_string(), 0));

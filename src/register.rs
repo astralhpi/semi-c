@@ -1,4 +1,3 @@
-use error::Error;
 use flow_graph::Type;
 
 #[repr(C)]
