@@ -13,6 +13,10 @@ impl<K: Hash + Eq, V> SymbolTable<K, V> {
         SymbolTable { list: LinkedList::new() }
     }
 
+    pub fn push_blinder(&mut self) {
+        self.list.push_front(None);
+    }
+
     pub fn push_scope(&mut self) {
         self.list.push_front(Some(HashMap::new()))
     }

@@ -87,6 +87,7 @@ impl Runtime {
         self.program_stack.clear();
         self.program_stack.push(("main".to_string(), 0));
         self.memory.push_scope();
+        self.var_table.push_blinder();
         self.var_table.push_scope();
         loop {
             let state = self.step()?;
@@ -149,6 +150,7 @@ impl Runtime {
                     }
                     &Instruction::FuncCall {ref name, args_size} => {
                         self.memory.push_scope();
+                        self.var_table.push_blinder();
                         self.var_table.push_scope();
                         let func  = self.flow_table.get(name).ok_or(
                             Error::Runtime("no function".to_string()))?;
@@ -183,10 +185,12 @@ impl Runtime {
                     &Instruction::Return => {
                         self.memory.drop_scope();
                         self.var_table.drop_scope();
+                        self.var_table.drop_scope();
                     },
                     &Instruction::ReturnVoid => {
                         self.register_stack.push(Register {int: 0});
                         self.memory.drop_scope();
+                        self.var_table.drop_scope();
                         self.var_table.drop_scope();
                     },
                     &Instruction::Printf { ref args_size } => {
