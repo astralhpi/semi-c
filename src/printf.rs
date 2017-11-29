@@ -30,6 +30,7 @@ impl Printf {
                     None => return None,
                     Some(ref r) => unsafe {
                         match c {
+                            'i' => buffer.push_str(&format!("{}", r.int)),
                             'd' => buffer.push_str(&format!("{}", r.int)),
                             'f' => buffer.push_str(&format!("{:.4}", r.float)),
                             'c' => buffer.push(r.ch),

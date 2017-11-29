@@ -242,6 +242,51 @@ impl Runtime {
                         }
                         self.program_stack.push((func_name, index+1));
                     },
+                    &Instruction::Eqi => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let i = if left.int == right.int {
+                                1
+                            } else {
+                                0
+                            };
+                            self.register_stack.push(Register {int: i});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Lti => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let i = if left.int < right.int {
+                                1
+                            } else {
+                                0
+                            };
+                            self.register_stack.push(Register {int: i});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Gti => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let i = if left.int > right.int {
+                                1
+                            } else {
+                                0
+                            };
+                            self.register_stack.push(Register {int: i});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
                     &Instruction::Minusi => {
                         let mut operand = self.register_stack.pop().ok_or(
                             Error::Runtime("no register".to_string()))?;
@@ -292,6 +337,51 @@ impl Runtime {
                         unsafe {
                             let val = left.float / right.float;
                             self.register_stack.push(Register {float: val});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Eqf => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let i = if left.float == right.float {
+                                1
+                            } else {
+                                0
+                            };
+                            self.register_stack.push(Register {int: i});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Ltf => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let i = if left.float < right.float {
+                                1
+                            } else {
+                                0
+                            };
+                            self.register_stack.push(Register {int: i});
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Gtf => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let i = if left.float > right.float {
+                                1
+                            } else {
+                                0
+                            };
+                            self.register_stack.push(Register {int: i});
                         }
                         self.program_stack.push((func_name, index+1));
                     },
@@ -604,6 +694,107 @@ mod tests {
             }
             "#;
         assert_eq!(run_test(code), "false true end");
+
+    }
+
+    #[test]
+    fn compare_int() {
+        let code = r#"
+            int main(void) {
+                printf("%i ", 1 < 2);
+                printf("%i ", 2 < 1);
+                printf("%i ", 1 < 1);
+
+                printf("%i ", 1 <= 2);
+                printf("%i ", 2 <= 1);
+                printf("%i ", 1 <= 1);
+
+                printf("%i ", 1 == 1);
+                printf("%i ", 1 == 2);
+                printf("%i ", 1 != 1);
+                printf("%i ", 1 != 2);
+
+                printf("%i ", 1 > 2);
+                printf("%i ", 2 > 1);
+                printf("%i ", 1 > 1);
+
+                printf("%i ", 1 >= 2);
+                printf("%i ", 2 >= 1);
+                printf("%i ", 1 >= 1);
+            }
+            "#;
+        assert_eq!(run_test(code), "1 0 0 1 0 1 1 0 0 1 0 1 0 0 1 1 ");
+
+    }
+
+    #[test]
+    fn compare_float() {
+        let code = r#"
+            int main(void) {
+                printf("%i ", 0.1 < 0.2);
+                printf("%i ", 0.2 < 0.1);
+                printf("%i ", 0.1 < 0.1);
+
+                printf("%i ", 0.1 <= 0.2);
+                printf("%i ", 0.2 <= 0.1);
+                printf("%i ", 0.1 <= 0.1);
+
+                printf("%i ", 0.1 == 0.1);
+                printf("%i ", 0.1 == 0.2);
+                printf("%i ", 0.1 != 0.1);
+                printf("%i ", 0.1 != 0.2);
+
+                printf("%i ", 0.1 > 0.2);
+                printf("%i ", 0.2 > 0.1);
+                printf("%i ", 0.1 > 0.1);
+
+                printf("%i ", 0.1 >= 0.2);
+                printf("%i ", 0.2 >= 0.1);
+                printf("%i ", 0.1 >= 0.1);
+            }
+            "#;
+        assert_eq!(run_test(code), "1 0 0 1 0 1 1 0 0 1 0 1 0 0 1 1 ");
+
+    }
+
+
+    #[test]
+    fn if_else_branch() {
+        let code = r#"
+            int main(void) {
+                int i = 100;
+                if (i < 100) {
+                    printf("small ");
+                } else if (i > 100) {
+                    printf("large ");
+                } else {
+                    printf("same ");
+                }
+                
+                int a = 1123;
+                if (a < 1123) {
+                    printf("small ");
+                } else if (a == 1123) {
+                    printf("same ");
+                } else {
+                    printf("large ");
+                }
+
+
+                float b = 12.3;
+                if (b < 12.2) {
+                    printf("small ");
+                } else if (b > 12.4) {
+                    printf("large ");
+                } else {
+                    printf("same ");
+                }
+                printf("end");
+
+
+            }
+            "#;
+        assert_eq!(run_test(code), "same same same end");
 
     }
 

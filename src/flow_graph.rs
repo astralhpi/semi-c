@@ -423,6 +423,11 @@ impl Convert {
                 &Some(ref e) => {
                     let (mut assign_flow, _) = Convert::convert_simple_assign(
                         id, e, &e.span, type_table)?;
+                    flow.append(&mut assign_flow);
+                    flow.push_back(Node {
+                        span: e.span.clone(),
+                        instruction: Instruction::Pop
+                    });
                 }
             };
         }
@@ -912,7 +917,7 @@ impl Convert {
                 &Type::Float => {
                     result.push_back(Node {
                         span: op.span.clone(),
-                        instruction: Instruction::Addf,
+                        instruction: Instruction::Eqf,
                     });
                     result.push_back(Node {
                         span: op.span.clone(),
