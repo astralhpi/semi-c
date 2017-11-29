@@ -24,7 +24,7 @@ impl Printf {
         let mut buffer = String::new();
         let mut is_format = false;
         for c in fmt.chars() {
-            if (is_format) {
+            if is_format {
                 let r = args_stack.pop();
                 match r {
                     None => return None,
@@ -44,7 +44,7 @@ impl Printf {
                     }
                 }
                 is_format = false;
-            } else if (c == '%'){
+            } else if c == '%' {
                 is_format = true;
             } else {
                 buffer.push(c);
