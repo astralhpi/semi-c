@@ -407,6 +407,27 @@ impl Convert {
                 Ok(flow)
 
             },
+            &ast::StmtKind::While(ref cond, ref body) => {
+                let mut body_flow = Convert::convert_stmt(
+                    body, type_table, return_type)?;
+                let (mut cond_flow, _) = Convert::convert_expr(cond, type_table)?;
+                cond_flow.push_back(Node {
+                    span: cond.span.clone(),
+                    instruction: Instruction::JumpIfZero(
+                        body_flow.len() as i32 + 2)
+                });
+                let body_offset = - (
+                    cond_flow.len() as i32
+                    + body_flow.len() as i32);
+                body_flow.push_back(Node {
+                    span: body.span.clone(),
+                    instruction: Instruction::Jump(body_offset)
+                });
+                cond_flow.append(&mut body_flow);
+
+                Ok(cond_flow)
+
+            },
             &ast::StmtKind::For(ref init, ref check, ref inc, ref body) => {
                 let mut init_flow = match init {
                     &None => Flow::new(),

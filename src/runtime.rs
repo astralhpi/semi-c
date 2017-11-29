@@ -812,6 +812,21 @@ mod tests {
         assert_eq!(run_test(code), "5050");
     }
 
+    #[test]
+    fn simple_while() {
+        let code = r#"
+            int main(void) {
+                int i = 0, sum = 0;
+                while (i <= 100) {
+                    sum =  sum + i;
+                    i++;
+                }
+                printf("%i", sum);
+            }
+            "#;
+        assert_eq!(run_test(code), "5050");
+    }
+
 }
 
 
