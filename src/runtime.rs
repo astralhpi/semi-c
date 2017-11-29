@@ -16,9 +16,13 @@ impl VarTable {
             -> Result<(), Error> {
         {
             let scope = self.list.front().ok_or(Error::NoScope)?;
-            if scope.contains_key(&name) {
-                return Err(Error::Runtime("duplicated var".to_string()));
-            }
+            match scope {
+                &None => return Err(Error::NoScope),
+                &Some(ref table) => if table.contains_key(&name) {
+                    return Err(Error::Runtime("duplicated var".to_string()));
+                }
+            };
+            
         }
         let mut history = History::new();
         history.push((line, None));

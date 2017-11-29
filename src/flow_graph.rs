@@ -158,8 +158,11 @@ impl TypeTable {
         let scope = self.list.front();
         match scope {
             None => false,
-            Some(ref table) => {
-                !table.contains_key(name)
+            Some(op) => {
+                match op {
+                    &None => false,
+                    &Some(ref table) => !table.contains_key(name)
+                }
             }
         }
     }

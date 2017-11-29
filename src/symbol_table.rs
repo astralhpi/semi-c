@@ -4,7 +4,7 @@ use std::cmp::Eq;
 
 
 pub struct SymbolTable<K: Hash + Eq, V>{
-    pub list: LinkedList<HashMap<K, V>>,
+    pub list: LinkedList<Option<HashMap<K, V>>>,
 }
 
 
@@ -14,7 +14,7 @@ impl<K: Hash + Eq, V> SymbolTable<K, V> {
     }
 
     pub fn push_scope(&mut self) {
-        self.list.push_front(HashMap::new())
+        self.list.push_front(Some(HashMap::new()))
     }
 
     pub fn drop_scope(&mut self) {
@@ -25,9 +25,11 @@ impl<K: Hash + Eq, V> SymbolTable<K, V> {
     }
 
     pub fn insert(&mut self, key: K, value: V) {
-        match self.list.front_mut() {
-            Some(ref mut table) => table.insert(key, value),
-            None => panic!("SymbolTable: no scope to add")
+        let err = "SymbolTable: no scope to add";
+        let node = self.list.front_mut().expect(err);
+        match node {
+            &mut Some(ref mut t) => t.insert(key, value),
+            &mut None => panic!(err),
         };
     }
 
@@ -41,11 +43,14 @@ impl<K: Hash + Eq, V> SymbolTable<K, V> {
 
     pub fn get_with_depth(&self, key: &K) -> Option<(&V, usize)> {
         let mut depth = self.list.len();
-        for table in &self.list {
-            match table.get(key) {
-                Some(v) => return Some((v, depth)),
-                None => depth -= 1,
-            }
+        for op in &self.list {
+            match op {
+                &Some(ref table) => match table.get(key) {
+                    Some(v) => return Some((v, depth)),
+                    None => depth -= 1,
+                },
+                &None => return None,
+            };
         }
         Option::None
     }
@@ -58,16 +63,21 @@ impl<K: Hash + Eq, V> SymbolTable<K, V> {
 
     }
 
+
     pub fn get_mut_with_depth(&mut self, key: &K) -> Option<(&mut V, usize)> {
         let mut depth = self.list.len();
-        for table in &mut self.list {
-            match table.get_mut(key) {
-                Some(mut v) => return Some((v, depth)),
-                None => depth -= 1,
-            }
+        for mut op in &mut self.list {
+            match op {
+                &mut Some(ref mut table) => match table.get_mut(key) {
+                    Some(v) => return Some((v, depth)),
+                    None => depth -= 1,
+                },
+                &mut None => return None,
+            };
         }
         Option::None
     }
+    
     pub fn depth(&self) -> usize {
         self.list.len()
     }
