@@ -583,6 +583,7 @@ impl Convert {
                                  ) -> ConvertResult<(Flow, Type)> {
         match type_table.get(&id.node) {
             Some(var_type) => {
+                Convert::error_if_func_type(&var_type, span)?;
                 let (mut flow, t) = Convert::convert_expr(
                     expr, type_table)?;
                 let mut cast_flow = Convert::auto_type_cast(
@@ -602,6 +603,13 @@ impl Convert {
         }
 
     }
+
+    pub fn error_if_func_type(t: &Type, span: &Span) -> ConvertResult<()> {
+        match t {
+            &Type::Arrow(_, _) => Err(Error::TypeError(span.clone())),
+            _ => Ok(())
+        }
+    }
     
     pub fn convert_assg(assg: &ast::Assg,
                         type_table: &TypeTable) -> ConvertResult<(Flow, Type)> {
@@ -612,11 +620,13 @@ impl Convert {
             &ast::AssgKind::Inc(ref id) => {
                 match type_table.get(&id.node) {
                     Some(var_type) => {
+                        Convert::error_if_func_type(&var_type, &assg.span)?;
                         let mut flow = Flow::new();
                         flow.push_back(Node {
                             span: assg.span.clone(),
                             instruction: Instruction::LoadVar(id.node.to_string())
                         });
+
                         flow.push_back(Node {
                             span: assg.span.clone(),
                             instruction: Instruction::LoadInt(1)
@@ -641,6 +651,7 @@ impl Convert {
             &ast::AssgKind::Dec(ref id) => {
                 match type_table.get(&id.node) {
                     Some(var_type) => {
+                        Convert::error_if_func_type(&var_type, &assg.span)?;
                         let mut flow = Flow::new();
                         flow.push_back(Node {
                             span: assg.span.clone(),
@@ -670,6 +681,7 @@ impl Convert {
             &ast::AssgKind::PostInc(ref id) => {
                 match type_table.get(&id.node) {
                     Some(var_type) => {
+                        Convert::error_if_func_type(&var_type, &assg.span)?;
                         let mut flow = Flow::new();
                         flow.push_back(Node {
                             span: assg.span.clone(),
@@ -705,6 +717,7 @@ impl Convert {
             &ast::AssgKind::PostDec(ref id) => {
                 match type_table.get(&id.node) {
                     Some(var_type) => {
+                        Convert::error_if_func_type(&var_type, &assg.span)?;
                         let mut flow = Flow::new();
                         flow.push_back(Node {
                             span: assg.span.clone(),

@@ -4,17 +4,11 @@ extern crate lalrpop_util;
 use meta_data::MetaData;
 use error::syntax_error;
 use lalrpop_util::ParseError::*;
-use std::error::Error;
-use std::fs::File;
-use std::path::Path;
-use std::io::prelude::*;
 
 pub fn parse(meta: &MetaData) -> Result<parser::ast::Program, String> {
     match parser::semic::parse_Prog(&meta.code) {
         Ok(ast) => Result::Ok(ast),
         Err(e) => {
-            print!("{:?}", e);
-
             match e {
                 UnrecognizedToken {token, expected} => {
                     let _expected = expected;
@@ -86,20 +80,4 @@ int main(void) {
     }
 }
 
-pub fn read(path:&str) -> String {
-    let path = Path::new(path);
-    let display = path.display();
-
-    let mut file = match File::open(&path) {
-        Err(why) => panic!("couldn't open {}: {}", display, why.description()),
-        Ok(file) => file,
-    };
-
-    let mut s = String::new();
-    match file.read_to_string(&mut s) {
-        Err(why) => panic!("couldn't read {}: {}", display, why.description()),
-        Ok(_)  => s
-    }
-
-}
 
