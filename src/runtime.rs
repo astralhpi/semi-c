@@ -538,6 +538,29 @@ mod tests {
             }
             "#;
         assert_eq!(run_test(code), "55 10 0 0 45 10 ");
+    }
+    #[test]
+    fn simple_branch() {
+        let code = r#"
+            int main(void) {
+                int i = 0;
+                if (i) {
+                    printf("true ");
+                }
+                else {
+                    printf("false ");
+                }
+
+                if (!i) {
+                    printf("true ");
+                }
+                else {
+                    printf("false ");
+                }
+                printf("end");
+            }
+            "#;
+        assert_eq!(run_test(code), "false true end");
 
     }
 

@@ -180,20 +180,12 @@ pub VarName: ast::VarName = {
 
 
 pub Stmt: ast::Stmt = {
-    <matched:Matched> => matched,
-    <unmatched:Unmatched> => unmatched,
-    <l:@L> "while" "(" <expr:Expr> ")" <stmt:Stmt> <r:@R> => ast::Stmt {
-        span: Span::new(l, r),
-        node: ast::StmtKind::While(Box::new(expr), Box::new(stmt))
-    },
-    <l:@L> "for" "("
-        <init:Optional<Assg>> ";"
-        <check:Optional<Expr>> ";"
-        <inc:Optional<Assg>>
-        ")" <stmt:Stmt> <r:@R> => ast::Stmt {
-            span: Span::new(l, r),
-            node: ast::StmtKind::For(init, check, inc, Box::new(stmt))
-        },
+    OpenStmt => <>,
+    ClosedStmt => <>,
+
+};
+
+pub StmtOther: ast::Stmt = {
     <l:@L> "return" <stmt:Optional<Expr>> ";" <r:@R> => ast::Stmt {
         span: Span::new(l, r),
         node: ast::StmtKind::Return(stmt)
@@ -219,25 +211,61 @@ pub Stmt: ast::Stmt = {
         node: ast::StmtKind::VarDelc(Box::new(v))
     }
 };
-
-pub Matched: ast::Stmt = {
-    <l:@L> "if" "(" <expr:Expr> ")" <stmt:Matched> "else" <stmt2:Matched> <r:@R> => {
-        ast::Stmt {
-            span: Span::new(l, r),
-            node: ast::StmtKind::If(
-                Box::new(expr),
-                Box::new(stmt),
-                Option::Some(Box::new(stmt2)))
-        }
-    }
+pub OpenStmt: ast::Stmt = {
+    OpenIfStmt => <>,
+    OpenWhileStmt => <>,
+    OpenForStmt => <>,
+};
+pub ClosedStmt: ast::Stmt = {
+    ClosedIfStmt => <>,
+    ClosedWhileStmt => <>,
+    ClosedForStmt => <>,
+    StmtOther => <>,
 };
 
-pub Unmatched: ast::Stmt = {
+pub OpenForStmt: ast::Stmt = {
+    <l:@L> "for" "("
+        <init:Optional<Assg>> ";"
+        <check:Optional<Expr>> ";"
+        <inc:Optional<Assg>>
+        ")" <stmt:OpenStmt> <r:@R> => ast::Stmt {
+            span: Span::new(l, r),
+            node: ast::StmtKind::For(init, check, inc, Box::new(stmt))
+        },
+};
+
+pub ClosedForStmt: ast::Stmt = {
+    <l:@L> "for" "("
+        <init:Optional<Assg>> ";"
+        <check:Optional<Expr>> ";"
+        <inc:Optional<Assg>>
+        ")" <stmt:ClosedStmt> <r:@R> => ast::Stmt {
+            span: Span::new(l, r),
+            node: ast::StmtKind::For(init, check, inc, Box::new(stmt))
+        },
+};
+
+
+pub OpenWhileStmt: ast::Stmt = {
+    <l:@L> "while" "(" <expr:Expr> ")" <stmt:OpenStmt> <r:@R> => ast::Stmt {
+        span: Span::new(l, r),
+        node: ast::StmtKind::While(Box::new(expr), Box::new(stmt))
+    },
+};
+
+pub ClosedWhileStmt: ast::Stmt = {
+    <l:@L> "while" "(" <expr:Expr> ")" <stmt:ClosedStmt> <r:@R> => ast::Stmt {
+        span: Span::new(l, r),
+        node: ast::StmtKind::While(Box::new(expr), Box::new(stmt))
+    },
+};
+
+pub OpenIfStmt: ast::Stmt = {
     <l:@L> "if" "(" <expr:Expr> ")" <stmt:Stmt> <r:@R> => ast::Stmt {
         span: Span::new(l, r),
         node: ast::StmtKind::If(Box::new(expr), Box::new(stmt), Option::None)
     },
-    <l:@L> "if" "(" <expr:Expr> ")" <stmt:Matched> "else" <stmt2:Unmatched> <r:@R> => {
+    <l:@L> "if" "(" <expr:Expr> ")" <stmt:ClosedStmt> "else" <stmt2:OpenStmt> <r:@R> => {
         ast::Stmt {
             span: Span::new(l, r),
             node: ast::StmtKind::If(
@@ -247,6 +275,18 @@ pub Unmatched: ast::Stmt = {
         }
     }
 };
+pub ClosedIfStmt: ast::Stmt = {
+    <l:@L> "if" "(" <expr:Expr> ")" <stmt:ClosedStmt> "else" <stmt2:ClosedStmt> <r:@R> => {
+        ast::Stmt {
+            span: Span::new(l, r),
+            node: ast::StmtKind::If(
+                Box::new(expr),
+                Box::new(stmt),
+                Option::Some(Box::new(stmt2)))
+        }
+    },
+};
+
 
 pub AssgUnary: ast::Assg = {
     <l:@L> <id:Id> "++" <r:@R> => ast::Assg {
