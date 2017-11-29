@@ -407,6 +407,67 @@ impl Convert {
                 Ok(flow)
 
             },
+            &ast::StmtKind::For(ref init, ref check, ref inc, ref body) => {
+                let mut init_flow = match init {
+                    &None => Flow::new(),
+                    &Some(ref assg) => {
+                        let (mut f, _) = Convert::convert_assg(assg, type_table)?;
+                        f.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::Pop
+                        });
+                        f
+                    }
+                };
+
+                let mut body_flow = Convert::convert_stmt(body,
+                                                          type_table,
+                                                          return_type)?;
+
+                let mut inc_flow = match inc {
+                    &None => Flow::new(),
+                    &Some(ref assg) => {
+                        let (mut f, _) = Convert::convert_assg(assg, type_table)?;
+                        f.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::Pop
+                        });
+                        f
+                    }
+                };
+
+                let mut check_flow = match check {
+                    &None => Flow::new(),
+                    &Some(ref expr) => {
+                        let (mut f, _) = Convert::convert_expr(expr, type_table)?;
+                        f.push_back(Node {
+                            span: expr.span.clone(),
+                            instruction: Instruction::JumpIfZero(
+                                body_flow.len() as i32 + 2)
+                        });
+                        f
+                    }
+                };
+
+                init_flow.push_back(Node {
+                    span: stmt.span.clone(),
+                    instruction: Instruction::Jump(inc_flow.len() as i32 + 1)
+                });
+                let body_offset = - (
+                    check_flow.len() as i32
+                    + inc_flow.len() as i32
+                    + body_flow.len() as i32);
+                body_flow.push_back(Node {
+                    span: stmt.span.clone(),
+                    instruction: Instruction::Jump(body_offset)
+                });
+                init_flow.append(&mut inc_flow);
+                init_flow.append(&mut check_flow);
+                init_flow.append(&mut body_flow);
+
+                Ok(init_flow)
+
+            }
             _ => Err(Error::NotImplementedSyntax(stmt.span.clone()))
         }
     }

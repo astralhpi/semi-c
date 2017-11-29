@@ -798,6 +798,20 @@ mod tests {
 
     }
 
+    #[test]
+    fn simple_for() {
+        let code = r#"
+            int main(void) {
+                int i = 100, sum = 0;
+                for (i=0; i<=100; i++) {
+                    sum =  sum + i;
+                }
+                printf("%i", sum);
+            }
+            "#;
+        assert_eq!(run_test(code), "5050");
+    }
+
 }
 
 
