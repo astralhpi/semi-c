@@ -119,6 +119,12 @@ pub enum Instruction {
     Return,
     ReturnVoid,
     Pop,
+    ScopeBegin,
+    ScopeEnd,
+    
+    // move
+    Jump(i32),
+    JumpIfZero(i32),
 
 }
 
@@ -347,6 +353,59 @@ impl Convert {
             },
             &ast::StmtKind::VarDelc(ref var_delc) => {
                 Convert::convert_var_delc(var_delc, type_table)
+            },
+            &ast::StmtKind::If(ref check_expr, ref then_body, ref else_body) => {
+                let (mut flow, t) = Convert::convert_expr(check_expr,
+                                                          type_table)?;
+                let mut then_flow = Convert::convert_stmt(then_body,
+                                                          type_table,
+                                                          return_type)?;
+
+                match else_body {
+                    &Some(ref body) => {
+                        let mut else_flow = Convert::convert_stmt(body,
+                                                                  type_table,
+                                                                  return_type)?;
+                        then_flow.push_back(Node {
+                            span: stmt.span.clone(),
+                            instruction: Instruction::Jump(
+                                (else_flow.len() + 1) as i32)
+                        });
+                        flow.push_back(Node {
+                            span: stmt.span.clone(),
+                            instruction: Instruction::JumpIfZero(
+                                (then_flow.len() + 1) as i32)
+                        });
+                        flow.append(&mut then_flow);
+                        flow.append(&mut else_flow);
+                        Ok(flow)
+                    }
+                    &None => {
+                        flow.push_back(Node {
+                            span: stmt.span.clone(),
+                            instruction: Instruction::JumpIfZero(
+                                (then_flow.len() + 1) as i32)
+                        });
+                        flow.append(&mut then_flow);
+                        Ok(flow)
+
+                    }
+                }
+            },
+            &ast::StmtKind::Block(ref stmts) => {
+                let mut flow = Convert::convert_stmts(stmts,
+                                                 type_table,
+                                                 return_type)?;
+                flow.push_front(Node {
+                    span: stmt.span.clone(),
+                    instruction: Instruction::ScopeBegin
+                });
+                flow.push_back(Node {
+                    span: stmt.span.clone(),
+                    instruction: Instruction::ScopeEnd
+                });
+                Ok(flow)
+
             },
             _ => Err(Error::NotImplementedSyntax(stmt.span.clone()))
         }
@@ -710,6 +769,20 @@ impl Convert {
             &ast::ExprKind::Assign(ref assg) => {
                 Convert::convert_assg(assg, type_table)
             },
+            &ast::ExprKind::Not(ref operand) => {
+                let (mut flow, t) = Convert::convert_expr(operand, type_table)?;
+                flow.append(&mut Convert::auto_type_cast(
+                        &t,
+                        &Type::Int,
+                        &expr.span)?);
+
+                flow.push_back(Node {
+                    span: expr.span.clone(),
+                    instruction: Instruction::Not
+                });
+                Ok((flow, Type::Int))
+
+            }
             _ => {
                 Err(Error::NotImplementedSyntax(expr.span.clone()))
             }

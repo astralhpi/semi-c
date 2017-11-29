@@ -354,12 +354,55 @@ impl Runtime {
                         self.register_stack.push(r);
                         self.program_stack.push((func_name, index+1));
                     },
+                    &Instruction::ScopeBegin => {
+                        self.memory.push_scope();
+                        self.var_table.push_scope();
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::ScopeEnd => {
+                        self.memory.drop_scope();
+                        self.var_table.drop_scope();
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Jump(offset) => {
+                        let mut index = index as i32;
+                        index += offset;
+                        self.program_stack.push((func_name, index as usize));
+                    },
+                    &Instruction::JumpIfZero(offset) => {
+                        let mut r = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            if r.int == 0 {
+                                let mut index = index as i32;
+                                index += offset;
+                                self.program_stack.push((func_name, index as usize));
+                            }
+                            else {
+                                self.program_stack.push((func_name, index+1));
+                            }
+
+                        }
+                    },
+                    &Instruction::Not => {
+                        let mut r = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            if r.int == 0 {
+                                r.int = 1;
+                            } else {
+                                r.int = 0;
+                            }
+                        }
+                        self.register_stack.push(r);
+                        self.program_stack.push((func_name, index+1));
+
+                    }
                     _ => {
                         return Err(Error::NotImplementedRuntime(
                                 format!("{:?}", n),
                                 n.span.clone()));
                     },
-
                 };
                 Ok(ProgramState::Processing)
             },
