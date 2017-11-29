@@ -7,6 +7,7 @@ use std::collections::{HashMap, LinkedList};
 use error::{syntax_error, Error};
 use helper::parse;
 use symbol_table::SymbolTable;
+use runtime::size_of;
 
 type TypeTable = SymbolTable<String, Type>;
 type ConvertResult<T> = Result<T, Error>;
@@ -77,6 +78,8 @@ pub enum Instruction {
 
     // load variable
     LoadVar(String),
+    // 1 -> 1
+    LoadAddr,
 
     // 1 -> 1
     SaveVar(String, Type),
@@ -85,12 +88,16 @@ pub enum Instruction {
     SaveAddr(Type),
     Declare(String, Type),
 
+    // 1 -> 1
     StackAlloc,
 
     // convert
     CharToInt,
     IntToFloat,
     FloatToInt,
+    IntToPointer,
+    PointerToInt,
+    IntToChar,
 
     // unary op
     Not,
@@ -531,6 +538,34 @@ impl Convert {
                 id.node.to_string(), t.clone())
         });
         type_table.insert(id.node.to_string(), t.clone());
+        match &ast_type.node {
+            &ast::TypeKind::Array(ref t, size) => {
+                let t = Type::from(t.as_ref());
+                let size = size.ok_or(
+                    Error::NoArraySize(ast_type.span.clone()))?;
+                let mem_size = size_of(&t) * (size as u32);
+                flow.push_back(Node {
+                    span: id.span.clone(),
+                    instruction: Instruction::LoadInt(mem_size as i32)
+                });
+                flow.push_back(Node {
+                    span: id.span.clone(),
+                    instruction: Instruction::StackAlloc
+                });
+                flow.push_back(Node {
+                    span: id.span.clone(),
+                    instruction: Instruction::SaveVar(
+                        id.node.to_string(),
+                        t.clone())
+                });
+                flow.push_back(Node {
+                    span: id.span.clone(),
+                    instruction: Instruction::Pop
+                });
+
+            },
+            _ => {}
+        };
         Ok((flow, t))
 
     }
@@ -696,7 +731,67 @@ impl Convert {
                     None => Err(Error::NotDeclared(id.span.clone()))
                 }
             },
-            _ => Err(Error::NotImplementedSyntax(assg.span.clone()))
+            &ast::AssgKind::AssignArray(ref id, ref offset, ref expr) => {
+                let t = type_table.get(&id.node).ok_or(
+                    Error::NoVariable(id.span.clone()))?;
+                let memory_type = match t {
+                    &Type::Pointer(ref t) => {Ok(t)},
+                    _ => Err(Error::TypeError(id.span.clone()))
+                }?;
+
+                let mut flow = Flow::new();
+                flow.push_back(Node {
+                    span: assg.span.clone(),
+                    instruction: Instruction::LoadVar(id.node.to_string())
+                });
+
+                flow.push_back(Node {
+                    span: assg.span.clone(),
+                    instruction: Instruction::PointerToInt
+                });
+
+
+                let (mut offset_flow, offset_type) = Convert::convert_expr(
+                    offset, type_table)?;
+                offset_flow.append(
+                    &mut Convert::auto_type_cast(
+                        &offset_type, &Type::Int, &assg.span)?);
+
+                flow.append(&mut offset_flow);
+
+                flow.push_back(Node {
+                    span: assg.span.clone(),
+                    instruction: Instruction::LoadInt(size_of(memory_type) as i32)
+                });
+
+                flow.push_back(Node {
+                    span: assg.span.clone(),
+                    instruction: Instruction::Muli
+                });
+                flow.push_back(Node {
+                    span: assg.span.clone(),
+                    instruction: Instruction::Addi
+                });
+
+
+                flow.append(
+                    &mut Convert::auto_type_cast(
+                        &Type::Int, t, &assg.span)?);
+
+                let (mut expr_flow, expr_type) = Convert::convert_expr(
+                    expr, type_table)?;
+                expr_flow.append(
+                    &mut Convert::auto_type_cast(
+                        &expr_type, &memory_type, &assg.span)?);
+                flow.append(&mut expr_flow);
+                flow.push_back(Node {
+                    span: assg.span.clone(),
+                    instruction: Instruction::SaveAddr(*memory_type.clone())
+                });
+
+                Ok((flow, *memory_type.clone()))
+
+            }
         }
 
     }
@@ -869,10 +964,53 @@ impl Convert {
                 });
                 Ok((flow, Type::Int))
 
+            },
+            &ast::ExprKind::Paren(ref e) => {
+                Convert::convert_expr(&*e, type_table)
+                
+            },
+            &ast::ExprKind::Index(ref id, ref e)  => {
+                let t = type_table.get(&id.node).ok_or(
+                    Error::NoVariable(expr.span.clone()))?;
+                let mem_type = match t {
+                    &Type::Pointer(ref tp) => Ok(tp),
+                    _ => Err(Error::TypeError(expr.span.clone()))
+                }?;
+                let mut flow = Flow::new();
+                flow.push_back(Node {
+                    span: expr.span.clone(),
+                    instruction: Instruction::LoadVar(id.node.to_string())
+                });
+                flow.append(
+                    &mut Convert::auto_type_cast(t, &Type::Int, &expr.span)?);
+
+                let (mut e_flow, e_type) = Convert::convert_expr(
+                    &*e,
+                    type_table)?;
+                e_flow.append(
+                    &mut Convert::auto_type_cast(&e_type, &Type::Int, &expr.span)?);
+                flow.append(&mut e_flow);
+
+                flow.push_back(Node {
+                    span: expr.span.clone(),
+                    instruction: Instruction::LoadInt(size_of(mem_type) as i32)
+                });
+
+                flow.push_back(Node {
+                    span: expr.span.clone(),
+                    instruction: Instruction::Muli
+                });
+                flow.push_back(Node {
+                    span: expr.span.clone(),
+                    instruction: Instruction::Addi
+                });
+                flow.push_back(Node {
+                    span: expr.span.clone(),
+                    instruction: Instruction::LoadAddr
+                });
+                Ok((flow, *mem_type.clone()))
             }
-            _ => {
-                Err(Error::NotImplementedSyntax(expr.span.clone()))
-            }
+            
         }
     }
 
@@ -1131,10 +1269,32 @@ impl Convert {
                         instruction: Instruction::IntToFloat
                     });
                 },
+                (&Type::Char, &Type::Pointer(_)) => {
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::CharToInt
+                    });
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::IntToPointer
+                    });
+                },
                 (&Type::Int, &Type::Float) => {
                     result.push_back(Node {
                         span: span.clone(),
                         instruction: Instruction::IntToFloat
+                    });
+                },
+                (&Type::Int, &Type::Char) => {
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::IntToChar
+                    });
+                },
+                (&Type::Int, &Type::Pointer(_)) => {
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::IntToPointer
                     });
                 },
                 (&Type::Float, &Type::Int) => {
@@ -1143,6 +1303,52 @@ impl Convert {
                         instruction: Instruction::FloatToInt
                     });
 
+                },
+                (&Type::Float, &Type::Char) => {
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::FloatToInt
+                    });
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::IntToChar
+                    });
+                },
+                (&Type::Float, &Type::Pointer(_)) => {
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::FloatToInt
+                    });
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::IntToPointer
+                    });
+                },
+                (&Type::Pointer(_), &Type::Int) => {
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::PointerToInt
+                    });
+                },
+                (&Type::Pointer(_), &Type::Char) => {
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::PointerToInt
+                    });
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::IntToChar
+                    });
+                },
+                (&Type::Pointer(_), &Type::Float) => {
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::PointerToInt
+                    });
+                    result.push_back(Node {
+                        span: span.clone(),
+                        instruction: Instruction::IntToFloat
+                    });
                 }
                 (_, _) => return Err(Error::TypeError(span.clone())),
             };

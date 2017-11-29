@@ -13,6 +13,7 @@ pub enum Error {
     NoScope,
     AlreadyDeclaredVar(Span),
     NotImplementedRuntime(String, Span),
+    NoArraySize(Span),
 }
 
 pub fn syntax_error<T>(meta:&MetaData, loc:usize) -> Result<T, String> {

@@ -133,6 +133,16 @@ impl Runtime {
                         self.register_stack.push(Register::from(data));
                         self.program_stack.push((func_name, index+1));
                     },
+                    &Instruction::LoadAddr => {
+                        let addr_reg = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            let data = self.memory.get_bytes(
+                                addr_reg.addr as usize, 4);
+                            self.register_stack.push(Register::from(data));
+                        }
+                        self.program_stack.push((func_name, index+1));
+                    }
                     &Instruction::FuncCall {ref name, args_size} => {
                         self.memory.push_scope();
                         self.var_table.push_scope();
@@ -421,6 +431,24 @@ impl Runtime {
                         self.register_stack.push(operand);
                         self.program_stack.push((func_name, index+1));
                     },
+                    &Instruction::PointerToInt => {
+                        let mut operand = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            operand.int = operand.addr as i32;
+                        }
+                        self.register_stack.push(operand);
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::IntToPointer => {
+                        let mut operand = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            operand.addr = operand.int as u32;
+                        }
+                        self.register_stack.push(operand);
+                        self.program_stack.push((func_name, index+1));
+                    },
                     &Instruction::Declare(ref name, ref t) => {
                         let size = size_of(t);
                         let addr = self.memory.alloc_stack(size as usize)?;
@@ -443,6 +471,22 @@ impl Runtime {
                             self.meta.line(n.span.lo));
                         self.register_stack.push(r);
                         self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::SaveAddr(ref t) => {
+                        let mut data = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let mut addr = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let size = size_of(t);
+                        unsafe {
+                            self.memory.load_register(
+                                addr.addr as usize,
+                                &data,
+                                size as usize);
+                        }
+                        self.register_stack.push(data);
+                        self.program_stack.push((func_name, index+1));
+
                     },
                     &Instruction::ScopeBegin => {
                         self.memory.push_scope();
@@ -487,7 +531,19 @@ impl Runtime {
                         self.register_stack.push(r);
                         self.program_stack.push((func_name, index+1));
 
-                    }
+                    },
+                    &Instruction::StackAlloc => {
+                       let mut r = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                       unsafe {
+                           let addr = self.memory.alloc_stack(
+                               r.int as usize)? as u32;
+                           self.register_stack.push(Register{addr});
+
+                       }
+                        self.program_stack.push((func_name, index+1));
+
+                    },
                     _ => {
                         return Err(Error::NotImplementedRuntime(
                                 format!("{:?}", n),
@@ -497,7 +553,6 @@ impl Runtime {
                 Ok(ProgramState::Processing)
             },
             &None => {
-                print!("end");
                 Ok(ProgramState::End)
             }
         }
@@ -505,7 +560,7 @@ impl Runtime {
 
 }
 
-fn size_of(t:&Type) -> u32 {
+pub fn size_of(t:&Type) -> u32 {
     match t {
         &Type::Int => 4,
         &Type::Float => 4,
@@ -520,11 +575,21 @@ fn size_of(t:&Type) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn print_program(program: &HashMap<String, Func>) {
+        for (k, v) in program.iter() {
+            println!("{}:", k);
+            for n in v.body.iter() {
+                println!("     {:?}", n.instruction);
+            }
+
+        }
+
+    }
     fn run_test(code: &str) -> String {
         let meta = MetaData::new(code.to_string());
         let ast = parse(&meta).unwrap();
         let func_table = Convert::convert_program(&ast).unwrap();
-        print!("{:?}\n", func_table);
+        print_program(&func_table);
         let mut runtime = Runtime::new(meta, func_table);
         runtime.run().unwrap();
         runtime.stdout.clone()
@@ -827,7 +892,42 @@ mod tests {
         assert_eq!(run_test(code), "5050");
     }
 
+    #[test]
+    fn simple_array() {
+        let code = r#"
+            int main(void) {
+                int a[3];
+                a[0] = 3;
+                a[1] = 2;
+                a[2] = 1;
+                printf("%i", a[0]);
+                printf("%i", a[1]);
+                printf("%i", a[2]);
+            }
+            "#;
+        assert_eq!(run_test(code), "321");
+
+    }
+    #[test]
+    fn simple_array_loop() {
+        let code = r#"
+            int main(void) {
+                int array[100];
+                int i;
+                for (i=0; i<100; i++) {
+                    array[i] = i + 1;
+                }
+
+                int sum = 0;
+                for (i=0; i<100; i++) {
+                    sum = sum + array[i];
+                }
+                printf("%i", sum);
+            }
+            "#;
+        assert_eq!(run_test(code), "5050");
+
+    }
+
+
 }
-
-
-//TODO: float inc
