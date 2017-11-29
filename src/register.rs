@@ -38,6 +38,17 @@ impl Register {
                 _ => format!("N/A")
             }
         }
+    }
+    pub fn clone(&self) -> Register {
+        let mut bytes: [u8; 4] = [0;4];
+        for i in 0..4 {
+            unsafe {
+                bytes[i] = self.bytes[i];
+            }
+        }
+        Register {
+            bytes
+        }
 
     }
 }
@@ -50,7 +61,7 @@ fn test_register() {
         assert_eq!(0, r.bytes[1]);
         assert_eq!(0, r.bytes[2]);
         assert_eq!(0, r.bytes[3]);
-
+        
         r.int = 0xFFFF;
         assert_eq!(0xFF, r.bytes[0]);
         assert_eq!(0xFF, r.bytes[1]);

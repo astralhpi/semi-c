@@ -128,6 +128,7 @@ pub enum Instruction {
     Pop,
     ScopeBegin,
     ScopeEnd,
+    CloneRegister,
     
     // move
     Jump(i32),
@@ -496,7 +497,9 @@ impl Convert {
                 Ok(init_flow)
 
             }
-            _ => Err(Error::NotImplementedSyntax(stmt.span.clone()))
+            &ast::StmtKind::Empty => {
+                Ok(Flow::new())
+            }
         }
     }
     
@@ -902,10 +905,43 @@ impl Convert {
                     &mut Convert::auto_type_cast(
                         &right_type, &target_type, &right.span)?);
 
-                left_flow.append(&mut right_flow);
 
                 let (mut op, t) = Convert::convert_bin_op(bin_op, &target_type)?;
-                left_flow.append(&mut op);
+                right_flow.append(&mut op);
+
+                match &bin_op.node {
+                    &ast::BinOpKind::And => {
+                        let len = right_flow.len() as i32;
+                        left_flow.push_back(Node {
+                            span: expr.span.clone(),
+                            instruction: Instruction::CloneRegister
+                        });
+                        left_flow.push_back(Node {
+                            span: expr.span.clone(),
+                            instruction: Instruction::JumpIfZero(
+                                len + 1)
+                        });
+                   },
+                    &ast::BinOpKind::Or => {
+                        let len = right_flow.len() as i32;
+                        left_flow.push_back(Node {
+                            span: expr.span.clone(),
+                            instruction: Instruction::CloneRegister
+                        });
+                        left_flow.push_back(Node {
+                            span: expr.span.clone(),
+                            instruction: Instruction::Not
+                        });
+                        left_flow.push_back(Node {
+                            span: expr.span.clone(),
+                            instruction: Instruction::JumpIfZero(
+                                len + 1)
+                        });
+
+                    },
+                    _ => {}
+                };
+                left_flow.append(&mut right_flow);
 
                 Ok((left_flow, t))
             },

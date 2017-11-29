@@ -37,7 +37,7 @@ impl VarTable {
         }
     }
 
-    fn update_var(&mut self, name: &String, value:String, line: usize){
+    fn update_var(&mut self, name: &String, value:String, line: usize) {
         match self.get_mut(name) {
             None => {},
             Some(mut v) => {
@@ -449,6 +449,15 @@ impl Runtime {
                         self.register_stack.push(operand);
                         self.program_stack.push((func_name, index+1));
                     },
+                    &Instruction::IntToChar => {
+                        let mut operand = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        unsafe {
+                            operand.bytes[0] = operand.int as u8;
+                        }
+                        self.register_stack.push(operand);
+                        self.program_stack.push((func_name, index+1));
+                    },
                     &Instruction::Declare(ref name, ref t) => {
                         let size = size_of(t);
                         let addr = self.memory.alloc_stack(size as usize)?;
@@ -544,11 +553,47 @@ impl Runtime {
                         self.program_stack.push((func_name, index+1));
 
                     },
-                    _ => {
-                        return Err(Error::NotImplementedRuntime(
-                                format!("{:?}", n),
-                                n.span.clone()));
+                    &Instruction::And => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+
+                        unsafe {
+                            let val = if left.int != 0 && right.int !=0 {
+                                1
+                            } else {
+                                0
+                            };
+                            self.register_stack.push(Register {int: val});
+                        }
+                        self.program_stack.push((func_name, index+1));
+
                     },
+                    &Instruction::Or => {
+                        let right = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let left = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+
+                        unsafe {
+                            let val = if left.int != 0 || right.int !=0 {
+                                1
+                            } else {
+                                0
+                            };
+                            self.register_stack.push(Register {int: val});
+                        }
+                        self.program_stack.push((func_name, index+1));
+
+                    },
+                    &Instruction::CloneRegister => {
+                        let r = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        self.register_stack.push(r.clone());
+                        self.register_stack.push(r);
+                        self.program_stack.push((func_name, index+1));
+                    }
                 };
                 Ok(ProgramState::Processing)
             },
@@ -578,8 +623,8 @@ mod tests {
     fn print_program(program: &HashMap<String, Func>) {
         for (k, v) in program.iter() {
             println!("{}:", k);
-            for n in v.body.iter() {
-                println!("     {:?}", n.instruction);
+            for (i, n) in v.body.iter().enumerate() {
+                println!("     {:2}| {:?}", i, n.instruction);
             }
 
         }
@@ -961,8 +1006,40 @@ mod tests {
             }
         "#;
         assert_eq!(run_test(code), "75.0000\n");
-
     }
+    #[test]
+    fn and_test() {
+        let code = r#"
+            int main(void) {
+                printf("%i ", 1 && 1);
+                printf("%i ", 0 && 1);
+                printf("%i ", 1 && 0);
+                printf("%i ", 0 && 0);
+                int a = 0, b = 0;
+                int c = a && b++;
+                printf("%i %i", c, b);
+            }
 
+        "#;
+        assert_eq!(run_test(code), "1 0 0 0 0 0");
+    }
+    #[test]
+    fn or_test() {
+        let code = r#"
+            int main(void) {
+                printf("%i ", 1 || 1);
+                printf("%i ", 0 || 1);
+                printf("%i ", 1 || 0);
+                printf("%i ", 0 || 0);
+                int a = 0, b = 0;
+                int c = a || b++;
+                printf("%i %i ", c, b);
+                int d = b || a++;
+                printf("%i %i", d, a);
+            }
+
+        "#;
+        assert_eq!(run_test(code), "1 1 1 0 0 1 1 0");
+    }
 
 }
