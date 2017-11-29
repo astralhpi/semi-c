@@ -3,7 +3,7 @@ use ast;
 use ast::{Span};
 use ast_utils::*;
 
-#[LALR] grammar;
+grammar;
 
 extern {
     type Location = usize;
@@ -248,16 +248,7 @@ pub Unmatched: ast::Stmt = {
     }
 };
 
-pub Assg: ast::Assg = {
-    <l:@L> <id:Id> "=" <expr:Expr> <r:@R> => ast::Assg {
-        span: Span::new(l, r),
-        node: ast::AssgKind::Assign(id, Box::new(expr))
-    },
-    <l:@L> <id:Id> "[" <expr1:Expr> "]" "=" <expr2:Expr> <r:@R> => ast::Assg {
-        span: Span::new(l, r),
-        node: ast::AssgKind::AssignArray(
-            id, Box::new(expr1), Box::new(expr2))
-    },
+pub AssgUnary: ast::Assg = {
     <l:@L> <id:Id> "++" <r:@R> => ast::Assg {
         span: Span::new(l, r),
         node: ast::AssgKind::PostInc(id)
@@ -273,11 +264,32 @@ pub Assg: ast::Assg = {
     <l:@L> "--" <id:Id> <r:@R> => ast::Assg {
         span: Span::new(l, r),
         node: ast::AssgKind::Inc(id)
+    }
+};
+
+pub AssgBinary: ast::Assg = {
+    <l:@L> <id:Id> "=" <expr:Expr> <r:@R> => ast::Assg {
+        span: Span::new(l, r),
+        node: ast::AssgKind::Assign(id, Box::new(expr))
     },
+    <l:@L> <id:Id> "[" <expr1:Expr> "]" "=" <expr2:Expr> <r:@R> => ast::Assg {
+        span: Span::new(l, r),
+        node: ast::AssgKind::AssignArray(
+            id, Box::new(expr1), Box::new(expr2))
+    }
+};
+
+pub Assg: ast::Assg = {
+    AssgBinary => <>,
+    AssgUnary => <>,
 };
 
 pub Expr: ast::Expr = {
-    OrExpr => <>
+    OrExpr => <>,
+    <l:@L> <assg:AssgBinary> <r:@R> => ast::Expr {
+        span: Span::new(l, r),
+        node: ast::ExprKind::Assign(Box::new(assg))
+    }
 };
 
 pub OrExpr: ast::Expr = {
@@ -343,6 +355,10 @@ pub Unary: ast::Expr = {
 };
 
 pub Term: ast::Expr = {
+    <l:@L> <assg:AssgUnary> <r:@R> => ast::Expr {
+        span: Span::new(l, r),
+        node: ast::ExprKind::Assign(Box::new(assg))
+    },
     <l:@L> "(" <e:Expr> ")" <r:@R> => ast::Expr {
         span: Span::new(l, r),
         node: ast::ExprKind::Paren(Box::new(e))

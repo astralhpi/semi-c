@@ -49,9 +49,9 @@ impl Memory {
         self.memory[addr]
     }
 
-    pub fn load_register(&mut self, addr: usize, register:&Register) {
+    pub fn load_register(&mut self, addr: usize, register:&Register, size:usize) {
         unsafe {
-            for i in 0..4 {
+            for i in 0..size {
                 self.memory[addr + i] = register.bytes[i];
             }
         }

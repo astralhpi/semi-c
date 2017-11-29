@@ -74,6 +74,8 @@ fn test_register() {
 
         r.bytes = [156, 255, 255, 255];
         assert_eq!(-100, r.int);
+        r.int = 100;
+        assert_eq!(r.addr, 100);
     }
 
 }

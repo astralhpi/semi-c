@@ -79,7 +79,8 @@ pub enum ExprKind {
     Call(Id, Vec<Expr>),
     Index(Id, Box<Expr>),
     Paren(Box<Expr>),
-    Lit(Box<Lit>)
+    Lit(Box<Lit>),
+    Assign(Box<Assg>)
 }
 
 #[derive(Debug, PartialEq)]

@@ -17,7 +17,7 @@ impl VarTable {
         {
             let scope = self.list.front().ok_or(Error::NoScope)?;
             if scope.contains_key(&name) {
-                return Err(Error::AlreadyDeclaredVar);
+                return Err(Error::Runtime("duplicated var".to_string()));
             }
         }
         let mut history = History::new();
@@ -142,14 +142,17 @@ impl Runtime {
 
 
                         for i in 0..args_size {
-                            let addr = self.memory.alloc_stack(4)?;
                             let (ref t, ref var_name) = *params.pop().ok_or(
                                 Error::Runtime("call error".to_string()))?;
                             let r = self.register_stack.pop().ok_or(
                                     Error::Runtime("no register".to_string()))?;
+
+                            let size = size_of(t);
+                            let addr = self.memory.alloc_stack(size as usize)?;
                             self.memory.load_register(
                                 addr,
-                                &r);
+                                &r,
+                                size as usize);
                             self.var_table.declare_var(
                                 var_name.to_string(),
                                 addr,
@@ -319,13 +322,36 @@ impl Runtime {
                         self.register_stack.push(operand);
                         self.program_stack.push((func_name, index+1));
                     },
-                    &Instruction::FloatToInt=> {
+                    &Instruction::FloatToInt => {
                         let mut operand = self.register_stack.pop().ok_or(
                             Error::Runtime("no register".to_string()))?;
                         unsafe {
                             operand.int = operand.float as i32;
                         }
                         self.register_stack.push(operand);
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::Declare(ref name, ref t) => {
+                        let size = size_of(t);
+                        let addr = self.memory.alloc_stack(size as usize)?;
+                        self.var_table.declare_var(
+                            name.to_string(),
+                            addr,
+                            self.meta.line(func.span.lo));
+                        self.program_stack.push((func_name, index+1));
+                    },
+                    &Instruction::SaveVar(ref name, ref t) => {
+                        let size = size_of(t);
+                        let mut r = self.register_stack.pop().ok_or(
+                            Error::Runtime("no register".to_string()))?;
+                        let addr = self.var_table.get_var_addr(name).ok_or(
+                            Error::NotDeclared(n.span.clone()))?;
+                        self.memory.load_register(addr, &r, size as usize);
+                        self.var_table.update_var(
+                            name,
+                            r.stringify(t),
+                            self.meta.line(n.span.lo));
+                        self.register_stack.push(r);
                         self.program_stack.push((func_name, index+1));
                     },
                     _ => {
@@ -342,6 +368,17 @@ impl Runtime {
                 Ok(ProgramState::End)
             }
         }
+    }
+
+}
+
+fn size_of(t:&Type) -> u32 {
+    match t {
+        &Type::Int => 4,
+        &Type::Float => 4,
+        &Type::Char => 1,
+        &Type::Pointer(_) => 4,
+        _ => 4,
     }
 
 }
@@ -466,23 +503,45 @@ mod tests {
     }
 
     #[test]
-    fn simple_for() {
+    fn simple_assg() {
         let code = r#"
             int main(void) {
                 int i=0, sum=0;
+                sum = sum + ++i;
+                sum = sum + ++i;
+                sum = sum + ++i;
+                sum = sum + ++i;
+                sum = sum + ++i;
+                sum = sum + ++i;
+                sum = sum + ++i;
+                sum = sum + ++i;
+                sum = sum + ++i;
+                sum = sum + ++i;
+               
+                printf("%d %d ", sum, i);
+                i = sum =0;
+                printf("%d %d ", sum, i);
 
-                for(i=0; i<10; i++) {
-                    sum = sum + i;
-                }
+                sum = sum + i++;
+                sum = sum + i++;
+                sum = sum + i++;
+                sum = sum + i++;
+                sum = sum + i++;
+                sum = sum + i++;
+                sum = sum + i++;
+                sum = sum + i++;
+                sum = sum + i++;
+                sum = sum + i++;
 
-                printf("%d", sum);
+                printf("%d %d ", sum, i);
 
             }
             "#;
-        assert_eq!(run_test(code), "55");
+        assert_eq!(run_test(code), "55 10 0 0 45 10 ");
 
     }
 
 }
 
 
+//TODO: float inc

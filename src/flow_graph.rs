@@ -78,6 +78,15 @@ pub enum Instruction {
     // load variable
     LoadVar(String),
 
+    // 1 -> 1
+    SaveVar(String, Type),
+
+    // 2 -> 1
+    SaveAddr(Type),
+    Declare(String, Type),
+
+    StackAlloc,
+
     // convert
     CharToInt,
     IntToFloat,
@@ -131,6 +140,15 @@ impl Node {
 }
 
 impl TypeTable {
+    fn can_declare(&self, name: &str) -> bool {
+        let scope = self.list.front();
+        match scope {
+            None => false,
+            Some(ref table) => {
+                !table.contains_key(name)
+            }
+        }
+    }
     fn push_funcs(
             &mut self,
             program: &ast::Program) {
@@ -319,10 +337,223 @@ impl Convert {
                 }
 
             },
+            &ast::StmtKind::Assign(ref assg) => {
+                let (mut flow, t)  = Convert::convert_assg(assg, type_table)?;
+                flow.push_back(Node {
+                    span: stmt.span.clone(),
+                    instruction: Instruction::Pop,
+                });
+                Ok(flow)
+            },
+            &ast::StmtKind::VarDelc(ref var_delc) => {
+                Convert::convert_var_delc(var_delc, type_table)
+            },
             _ => Err(Error::NotImplementedSyntax(stmt.span.clone()))
         }
     }
     
+    pub fn convert_var_delc(var_delc: &ast::VarDelc,
+                         type_table: &mut TypeTable) -> ConvertResult<Flow> {
+        let mut flow = Flow::new();
+        for &(ref t, ref id, ref expr) in &var_delc.names {
+            let (mut delc_flow, t) = Convert::convert_single_var_delc(
+                    t, id, type_table)?;
+            flow.append(&mut delc_flow);
+            match expr {
+                &None => {},
+                &Some(ref e) => {
+                    let (mut assign_flow, _) = Convert::convert_simple_assign(
+                        id, e, &e.span, type_table)?;
+                }
+            };
+        }
+        Ok(flow)
+
+    }
+    pub fn convert_single_var_delc(
+            ast_type: &ast::Type,
+            id: &ast::Id,
+            type_table: &mut TypeTable) -> ConvertResult<(Flow, Type)> {
+        if !type_table.can_declare(&id.node) {
+            return Err(Error::AlreadyDeclaredVar(id.span.clone()));
+        }
+        let t = Type::from(&ast_type.node);
+        let mut flow = Flow::new();
+        flow.push_back(Node {
+            span: id.span.clone(),
+            instruction: Instruction::Declare(
+                id.node.to_string(), t.clone())
+        });
+        type_table.insert(id.node.to_string(), t.clone());
+        Ok((flow, t))
+
+    }
+
+    pub fn convert_simple_assign(id:&ast::Id,
+                                 expr:&ast::Expr,
+                                 span:&Span,
+                                 type_table: &TypeTable
+                                 ) -> ConvertResult<(Flow, Type)> {
+        match type_table.get(&id.node) {
+            Some(var_type) => {
+                let (mut flow, t) = Convert::convert_expr(
+                    expr, type_table)?;
+                let mut cast_flow = Convert::auto_type_cast(
+                    &t, var_type, span)?;
+                flow.append(&mut cast_flow);
+                flow.push_back(Node {
+                    span: span.clone(),
+                    instruction: Instruction::SaveVar(
+                        id.node.to_string(),
+                        var_type.clone())
+                });
+
+                Ok((flow, var_type.clone()))
+
+            }
+            None => Err(Error::NotDeclared(id.span.clone()))
+        }
+
+    }
+    
+    pub fn convert_assg(assg: &ast::Assg,
+                        type_table: &TypeTable) -> ConvertResult<(Flow, Type)> {
+        match &assg.node {
+            &ast::AssgKind::Assign(ref id, ref expr) => {
+                Convert::convert_simple_assign(id, expr, &assg.span, type_table)
+            },
+            &ast::AssgKind::Inc(ref id) => {
+                match type_table.get(&id.node) {
+                    Some(var_type) => {
+                        let mut flow = Flow::new();
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::LoadVar(id.node.to_string())
+                        });
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::LoadInt(1)
+                        });
+
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::Addi
+                        });
+
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::SaveVar(
+                                id.node.to_string(),
+                                var_type.clone())
+                        });
+                        Ok((flow, var_type.clone()))
+                    },
+                    None => Err(Error::NotDeclared(id.span.clone()))
+                }
+            },
+            &ast::AssgKind::Dec(ref id) => {
+                match type_table.get(&id.node) {
+                    Some(var_type) => {
+                        let mut flow = Flow::new();
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::LoadVar(id.node.to_string())
+                        });
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::LoadInt(1)
+                        });
+
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::Subi
+                        });
+
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::SaveVar(
+                                id.node.to_string(),
+                                var_type.clone())
+                        });
+                        Ok((flow, var_type.clone()))
+                    },
+                    None => Err(Error::NotDeclared(id.span.clone()))
+                }
+            },
+            &ast::AssgKind::PostInc(ref id) => {
+                match type_table.get(&id.node) {
+                    Some(var_type) => {
+                        let mut flow = Flow::new();
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::LoadVar(id.node.to_string())
+                        });
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::LoadVar(id.node.to_string())
+                        });
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::LoadInt(1)
+                        });
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::Addi
+                        });
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::SaveVar(
+                                id.node.to_string(),
+                                var_type.clone())
+                        });
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::Pop
+                        });
+                        Ok((flow, var_type.clone()))
+                    },
+                    None => Err(Error::NotDeclared(id.span.clone()))
+                }
+            },
+            &ast::AssgKind::PostDec(ref id) => {
+                match type_table.get(&id.node) {
+                    Some(var_type) => {
+                        let mut flow = Flow::new();
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::LoadVar(id.node.to_string())
+                        });
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::LoadVar(id.node.to_string())
+                        });
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::LoadInt(1)
+                        });
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::Subi
+                        });
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::SaveVar(
+                                id.node.to_string(),
+                                var_type.clone())
+                        });
+                        flow.push_back(Node {
+                            span: assg.span.clone(),
+                            instruction: Instruction::Pop
+                        });
+                        Ok((flow, var_type.clone()))
+                    },
+                    None => Err(Error::NotDeclared(id.span.clone()))
+                }
+            },
+            _ => Err(Error::NotImplementedSyntax(assg.span.clone()))
+        }
+
+    }
     pub fn convert_func_call(func_id: String,
                              args: &Vec<ast::Expr>,
                              span: &Span,
@@ -475,8 +706,10 @@ impl Convert {
                     instruction
                 });
                 Ok((flow, target))
-
-            }
+            },
+            &ast::ExprKind::Assign(ref assg) => {
+                Convert::convert_assg(assg, type_table)
+            },
             _ => {
                 Err(Error::NotImplementedSyntax(expr.span.clone()))
             }

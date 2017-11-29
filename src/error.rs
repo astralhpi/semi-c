@@ -11,7 +11,7 @@ pub enum Error {
     NoMain,
     Runtime(String),
     NoScope,
-    AlreadyDeclaredVar,
+    AlreadyDeclaredVar(Span),
     NotImplementedRuntime(String, Span),
 }
 
