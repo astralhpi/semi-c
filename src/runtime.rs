@@ -978,7 +978,7 @@ mod tests {
         let code = r#"
             int avg(int count, int *value) {
                 int i, total;
-                int sum = 0;
+                total = 0;
                 for (i = 1; i < count; i++) {
                     int a;
                     total = total + value[i];
@@ -1005,7 +1005,7 @@ mod tests {
                 }
             }
         "#;
-        assert_eq!(run_test(code), "75.0000\n");
+        assert_eq!(run_test(code), "45.0000\n");
     }
     #[test]
     fn and_test() {
