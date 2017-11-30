@@ -73,7 +73,7 @@ int main(void) {
             assert!(false);
         }
         Err(e) => {
-            assert_eq!(e, "Syntax error: line 3");
+            assert_eq!(e, "Syntax error : line 3");
 
         }
 

@@ -8,7 +8,7 @@ use register::Register;
 use memory::Memory;
 use printf::Printf;
 
-type History = Vec<(usize, Option<String>)>;
+pub type History = Vec<(usize, Option<String>)>;
 type VarTable = SymbolTable<String, (usize, History)>;
 
 impl VarTable {
@@ -60,13 +60,14 @@ pub enum ProgramState {
 }
 
 pub struct Runtime {
-    meta: MetaData,
+    pub meta: MetaData,
     flow_table: HashMap<String, Func>,
     register_stack: Vec<Register>,
     memory: Memory,
     program_stack: Vec<(String, usize)>,
     var_table: VarTable,
     pub stdout: String,
+    line_pointer: u32,
 }
 
 
@@ -79,16 +80,75 @@ impl Runtime {
             memory: Memory::new(),
             program_stack: Vec::new(),
             var_table: VarTable::new(),
-            stdout: String::new()
+            stdout: String::new(),
+            line_pointer: 0
         }
     }
-    pub fn run(&mut self) -> Result<(), Error> {
+
+    pub fn prepare(&mut self) -> Result<(), Error> {
         self.flow_table.get("main").ok_or(Error::NoMain)?;
         self.program_stack.clear();
         self.program_stack.push(("main".to_string(), 0));
         self.memory.push_scope();
         self.var_table.push_blinder();
         self.var_table.push_scope();
+        self.line_pointer = match self.lookup_node() {
+            Some(n) => {
+                self.meta.line(n.span.lo)
+            },
+            None => 0
+        } as u32;
+        Ok(())
+    }
+
+    pub fn step_line(&mut self, line: u32) -> Result<ProgramState, Error> {
+        let mut line = line;
+        while line > 0 {
+            if self.program_stack.len() == 0 {
+                assert_eq!(self.register_stack.len(), 1);
+                return Ok(ProgramState::End);
+            }
+
+            let mut node_line = self.line_of_cur_node() as u32;
+
+            if self.will_line_jump() {
+                line -= 1;
+                self.step()?;
+                self.line_pointer = self.line_of_cur_node() as u32;
+            } else if self.line_pointer + line > node_line {
+                self.step()?;
+            } else {
+                break;
+            }
+        }
+        self.line_pointer += line;
+        Ok(ProgramState::Processing)
+    }
+
+    pub fn trace(&self, name:&str) -> Option<&History> {
+        match self.var_table.get(&name.to_string()) {
+            Some(&(_, ref history)) => Some(history),
+            None => None
+        }
+    }
+
+    pub fn print(&self, name:&str) -> Option<&str> {
+        match self.trace(name) {
+            Some(ref history) => {
+                let len = history.len();
+                let (_, ref val) = history[len - 1];
+                match val {
+                    &Some(ref s) => Some(s),
+                    &None => Some("N/A")
+                }
+            },
+            None => None
+        }
+
+    }
+
+    pub fn run(&mut self) -> Result<(), Error> {
+        self.prepare()?;
         loop {
             let state = self.step()?;
             match state {
@@ -98,6 +158,75 @@ impl Runtime {
         }
         Ok(())
     }
+
+    pub fn lookup_register(&self) -> &Register {
+        let idx = self.register_stack.len() - 1;
+        &self.register_stack[idx]
+
+    }
+
+    pub fn lookup_program_pointer(&self) -> &(String, usize) {
+        let idx = self.program_stack.len() - 1;
+        &self.program_stack[idx]
+    }
+
+    pub fn lookup_node(&self) -> Option<&Node> {
+        let &(ref func_name, index) = self.lookup_program_pointer();
+        self.get_node(func_name, index)
+    }
+
+    pub fn get_node(&self, func_name:&str, index: usize) -> Option<&Node> {
+        let func = self.flow_table.get(func_name).unwrap();
+        func.body.get(index)
+
+    }
+
+    fn line_of_cur_node(&self) -> usize {
+        let n = self.lookup_node().unwrap();
+        self.line_of_node(n)
+    }
+
+    fn line_of_node(&self, node:&Node) -> usize {
+        self.meta.line(node.span.lo)
+    }
+
+    fn will_line_jump(&self) -> bool {
+        let &(ref func_name, index) = self.lookup_program_pointer();
+        let n = self.get_node(func_name, index).unwrap();
+        let line = self.meta.line(n.span.lo);
+
+        match &n.instruction {
+            &Instruction::Jump(offset) => {
+                let i = index + offset as usize;
+                let target = self.get_node(func_name, i).unwrap();
+                let target_line = self.meta.line(target.span.lo);
+                line != target_line
+            },
+            &Instruction::JumpIfZero(offset) => {
+                let r = self.lookup_register();
+                unsafe {
+                    if r.int == 0 {
+                        let i = index + offset as usize;
+                        let target = self.get_node(func_name, i).unwrap();
+                        let target_line = self.meta.line(target.span.lo);
+                        line != target_line
+                    }
+                    else {
+                        false
+                    }
+                }
+
+            },
+            &Instruction::FuncCall{ref name, args_size} => {
+                let func = &self.flow_table[name];
+                let func_line = self.meta.line(func.span.lo);
+                func_line != line
+            }
+            _ => false
+        }
+
+    }
+
     fn step(&mut self) -> Result<ProgramState, Error> {
         if self.program_stack.len() == 0 {
             assert_eq!(self.register_stack.len(), 1);
@@ -472,7 +601,7 @@ impl Runtime {
                         self.var_table.declare_var(
                             name.to_string(),
                             addr,
-                            self.meta.line(func.span.lo));
+                            self.meta.line(n.span.lo));
                         self.program_stack.push((func_name, index+1));
                     },
                     &Instruction::SaveVar(ref name, ref t) => {
@@ -628,24 +757,27 @@ pub fn size_of(t:&Type) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn print_program(program: &HashMap<String, Func>) {
+    fn print_program(program: &HashMap<String, Func>, meta:&MetaData) {
         for (k, v) in program.iter() {
             println!("{}:", k);
             for (i, n) in v.body.iter().enumerate() {
-                println!("     {:2}| {:?}", i, n.instruction);
+                println!("     {:2}|{:2}| {:?}", i, meta.line(n.span.lo) + 1, n.instruction);
             }
 
         }
 
     }
     fn run_test(code: &str) -> String {
+        let mut runtime = runtime(code);
+        runtime.run().unwrap();
+        runtime.stdout.clone()
+    }
+    fn runtime(code: &str) -> Runtime {
         let meta = MetaData::new(code.to_string());
         let ast = parse(&meta).unwrap();
         let func_table = Convert::convert_program(&ast).unwrap();
-        print_program(&func_table);
-        let mut runtime = Runtime::new(meta, func_table);
-        runtime.run().unwrap();
-        runtime.stdout.clone()
+        print_program(&func_table, &meta);
+        Runtime::new(meta, func_table)
     }
 
     #[test]
@@ -1049,5 +1181,47 @@ mod tests {
         "#;
         assert_eq!(run_test(code), "1 1 1 0 0 1 1 0");
     }
+
+    #[test]
+    fn simple_step_line() {
+        let code = r#"
+            int main(void) {
+                printf("a");
+
+                printf("b");
+                printf("c");
+            }
+        "#;
+        let mut rt = runtime(code);
+        rt.prepare();
+        rt.step_line(2);
+        assert_eq!(rt.stdout, "a");
+        rt.step_line(2);
+        assert_eq!(rt.stdout, "abc");
+    }
+    #[test]
+    fn simple_step_line_if() {
+        let code = r#"
+            int main(void) {
+                printf("a");
+
+                if (0) {
+                    printf("b");
+                } else {
+                    printf("c");
+                }
+
+            }
+        "#;
+        let mut rt = runtime(code);
+        rt.prepare();
+        rt.step_line(2);
+        assert_eq!(rt.stdout, "a");
+        rt.step_line(2);
+        assert_eq!(rt.stdout, "a");
+        rt.step_line(1);
+        assert_eq!(rt.stdout, "ac");
+    }
+
 
 }

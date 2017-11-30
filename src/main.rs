@@ -24,8 +24,9 @@ use std::collections::HashMap;
 
 use meta_data::MetaData;
 use flow_graph::{Convert, Func};
-use runtime::Runtime;
+use runtime::{Runtime, ProgramState};
 use parser::ast;
+use std::io;
 
 fn read(path:&str) -> String {
     let path = Path::new(path);
@@ -115,6 +116,146 @@ fn run(filename:&str) {
     let meta = MetaData::new(code);
     let ast = parse(&meta);
     let program = compile(ast, &meta);
+    let mut runtime = Runtime::new(meta, program);
+    runtime.prepare();
+
+    loop {
+        let cmd = Command::read_command();
+        if cmd.is_none() { continue; }
+
+        match cmd.unwrap() {
+            Command::Next(n) => match runtime.step_line(n) {
+                Err(err) => {
+                    show_error(err, &runtime.meta);
+                    process::exit(1);
+                },
+                Ok(state) => match state {
+                    ProgramState::End => {
+                        println!("End of Program");
+                    }
+                    _ => {}
+                }
+            },
+            Command::Print(x) => match runtime.print(&x) {
+                None => println!("Invisible variable"),
+                Some(s) => println!("{}",s)
+            },
+            Command::Trace(x) => match runtime.trace(&x) {
+                None => println!("Invisible variable"),
+                Some(history) => {
+                    print_trace(history, &x);
+
+                }
+            }
+        }
+
+    }
+}
+
+fn print_trace(history:&Vec<(usize, Option<String>)>, name:&str) {
+    for &(ref line, ref val) in history {
+        print!("{} = ", name);
+        match val {
+            &None => print!("N/A"),
+            &Some(ref s) => print!("{}", s)
+        };
+        println!(" at line {}", line + 1);
+    }
+}
+
+pub enum Command {
+    Next(u32),
+    Print(String),
+    Trace(String),
+}
+
+impl Command {
+    fn read_command() -> Option<Command> {
+        print!(">> ");
+        io::stdout().flush();
+        let mut input = String::new();
+        match io::stdin().read_line(&mut input) {
+            Ok(n) => {
+                let input = input.replace("\n", "");
+                let sp: Vec<_> = input.split(" ").collect();
+                match sp[0] {
+                    "next" => match Command::parse_next(&sp) {
+                        Ok(c) => Some(c),
+                        Err(e) => {
+                            println!("{}", e);
+                            None
+                        }
+                    },
+                    "trace" => match Command::parse_trace(&sp) {
+                        Ok(c) => Some(c),
+                        Err(e) => {
+                            println!("{}", e);
+                            None
+                        }
+                    },
+                    "print" => match Command::parse_print(&sp) {
+                        Ok(c) => Some(c),
+                        Err(e) => {
+                            println!("{}", e);
+                            None
+                        }
+                    },
+                    _ => {
+                        println!("Available commands : next, print, trace");
+                        None
+
+                    }
+                }
+            },
+            _ => None
+        }
+    }
+
+    fn parse_print(sp: &Vec<&str>) -> Result<Command, &'static str> {
+        let err = Err("Invalid typing of the variable name") ;
+        if sp.len() != 2 {
+            err
+        } else {
+            match parser::semic::parse_Id(sp[1]) {
+                Ok(_) => Ok(Command::Print(sp[1].to_string())),
+                Err(_) => err
+            }
+        }
+
+    }
+
+    fn parse_trace(sp: &Vec<&str>) -> Result<Command, &'static str> {
+        let err = Err("Invalid typing of the variable name") ;
+        if sp.len() != 2 {
+            err
+        } else {
+            match parser::semic::parse_Id(sp[1]) {
+                Ok(_) => Ok(Command::Trace(sp[1].to_string())),
+                Err(_) => err
+            }
+        }
+
+    }
+
+    fn parse_next(sp: &Vec<&str>) -> Result<Command, &'static str> {
+        let err = Err("Incorrect command usage : try 'next [lines]'") ;
+        if sp.len() < 2 {
+            Ok(Command::Next(1))
+        } else if sp.len() > 2 {
+            err
+        } else {
+            match sp[1].parse() {
+                Ok(i) => {
+                    Ok(Command::Next(i))
+                },
+                Err(e) =>  {
+                    err
+                }
+            }
+        }
+
+    }
+
 }
 
 fn main() {

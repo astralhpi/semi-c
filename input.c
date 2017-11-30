@@ -16,7 +16,6 @@ int main(void) {
     
     count = 4;
     sum = 0;
-    met = 1;
 
     for (i=0; i < count; i++) {
         mark[i] = i * 30;

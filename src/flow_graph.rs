@@ -545,11 +545,11 @@ impl Convert {
         });
         type_table.insert(id.node.to_string(), t.clone());
         match &ast_type.node {
-            &ast::TypeKind::Array(ref t, size) => {
-                let t = Type::from(t.as_ref());
+            &ast::TypeKind::Array(ref item_type, size) => {
+                let item_type = Type::from(item_type.as_ref());
                 let size = size.ok_or(
                     Error::NoArraySize(ast_type.span.clone()))?;
-                let mem_size = size_of(&t) * (size as u32);
+                let mem_size = size_of(&item_type) * (size as u32);
                 flow.push_back(Node {
                     span: id.span.clone(),
                     instruction: Instruction::LoadInt(mem_size as i32)
@@ -844,7 +844,6 @@ impl Convert {
                     if arg_types.len() != args.len() {
                         return Err(Error::TypeError(span.clone()));
                     }
-
                     for (i, ref item) in args.iter().enumerate() {
                         let (mut flow, t) = Convert::convert_expr(
                             item, type_table)?;
