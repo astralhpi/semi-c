@@ -90,7 +90,7 @@ fn show_error(e: error::Error, meta: &MetaData) {
             println!("Not declared variable error : line {}", meta.line(span.lo) + 1);
         },
         error::Error::Runtime(s) => {
-            println!("Run-time error : {}", s);
+            println!("Run-time error : line {}", s);
         },
         error::Error::NoMain => {
             println!("Run-time error : No Main Function");
@@ -103,10 +103,13 @@ fn show_error(e: error::Error, meta: &MetaData) {
 
         },
         error::Error::NotImplementedRuntime(s, span) => {
-            println!("Run-time error : {}", meta.line(span.lo));
+            println!("Run-time error : line {}", meta.line(span.lo) + 1);
         },
         error::Error::NoArraySize(span) => {
-            println!("Type error : {}", meta.line(span.lo));
+            println!("Type error : line {}", meta.line(span.lo) + 1);
+        },
+        error::Error::DivideByZero(span) => {
+            println!("Run-time error : line {}", meta.line(span.lo) + 1);
         }
     }
 

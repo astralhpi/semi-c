@@ -410,6 +410,9 @@ impl Runtime {
                         let left = self.register_stack.pop().ok_or(
                             Error::Runtime("no register".to_string()))?;
                         unsafe {
+                            if right.int == 0 {
+                                Err(Error::DivideByZero(n.span.clone()))?
+                            }
                             let val = left.int / right.int;
                             self.register_stack.push(Register {int: val});
                         }
@@ -1248,6 +1251,5 @@ mod tests {
         rt.step_line(1);
         assert_eq!(rt.stdout, "ac");
     }
-
 
 }

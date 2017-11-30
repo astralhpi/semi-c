@@ -14,6 +14,7 @@ pub enum Error {
     AlreadyDeclaredVar(Span),
     NotImplementedRuntime(String, Span),
     NoArraySize(Span),
+    DivideByZero(Span),
 }
 
 pub fn syntax_error<T>(meta:&MetaData, loc:usize) -> Result<T, String> {
