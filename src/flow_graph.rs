@@ -134,6 +134,8 @@ pub enum Instruction {
     Jump(i32),
     JumpIfZero(i32),
 
+    Nothing,
+
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -260,7 +262,7 @@ impl Convert {
                         &mut type_table,
                         &decl.return_type)?;
                     flow.push_back(Node {
-                        span: dcl.span.clone(),
+                        span: Span::new(body.span.hi, body.span.hi + 1),
                         instruction: Instruction::ReturnVoid
                     });
 
@@ -318,7 +320,7 @@ impl Convert {
                 let (mut flow, t) = Convert::convert_func_call(
                     id.node.to_string(), exprs, &stmt.span, type_table)?;
                 flow.push_back(Node {
-                    span: stmt.span.clone(),
+                    span: Span::new(stmt.span.hi, stmt.span.hi + 1),
                     instruction: Instruction::Pop,
                 });
                 Ok(flow)
@@ -332,7 +334,7 @@ impl Convert {
                             Err(Error::TypeError(stmt.span.clone()))
                         } else {
                             flow.push_back(Node {
-                                span: stmt.span.clone(),
+                                span: Span::new(stmt.span.hi, stmt.span.hi + 1),
                                 instruction: Instruction::Return
                             });
                             Ok(flow)
@@ -342,7 +344,7 @@ impl Convert {
                         if return_type == &Type::Void {
                             let mut flow = Flow::new();
                             flow.push_back(Node {
-                                span: stmt.span.clone(),
+                                span: Span::new(stmt.span.hi, stmt.span.hi + 1),
                                 instruction: Instruction::ReturnVoid
                             });
                             Ok(flow)
@@ -357,7 +359,7 @@ impl Convert {
             &ast::StmtKind::Assign(ref assg) => {
                 let (mut flow, t)  = Convert::convert_assg(assg, type_table)?;
                 flow.push_back(Node {
-                    span: stmt.span.clone(),
+                    span: Span::new(stmt.span.hi, stmt.span.hi + 1),
                     instruction: Instruction::Pop,
                 });
                 Ok(flow)
@@ -371,19 +373,33 @@ impl Convert {
                 let mut then_flow = Convert::convert_stmt(then_body,
                                                           type_table,
                                                           return_type)?;
+                then_flow.push_front(Node {
+                    span: Span::new(then_body.span.lo, then_body.span.lo + 1),
+                    instruction: Instruction::Nothing
+                });
+
+                then_flow.push_back(Node {
+                    span: Span::new(then_body.span.hi, then_body.span.hi + 1),
+                    instruction: Instruction::Nothing
+                });
+
 
                 match else_body {
                     &Some(ref body) => {
                         let mut else_flow = Convert::convert_stmt(body,
                                                                   type_table,
                                                                   return_type)?;
+                        else_flow.push_front(Node {
+                            span: Span::new(body.span.lo, body.span.lo + 1),
+                            instruction: Instruction::Nothing
+                        });
                         then_flow.push_back(Node {
-                            span: stmt.span.clone(),
+                            span: Span::new(then_body.span.lo, then_body.span.lo + 1),
                             instruction: Instruction::Jump(
                                 (else_flow.len() + 1) as i32)
                         });
                         flow.push_back(Node {
-                            span: stmt.span.clone(),
+                            span: Span::new(check_expr.span.hi, check_expr.span.hi + 1),
                             instruction: Instruction::JumpIfZero(
                                 (then_flow.len() + 1) as i32)
                         });
@@ -392,8 +408,12 @@ impl Convert {
                         Ok(flow)
                     }
                     &None => {
+                        let span = match flow.back() {
+                            Some(ref b) => b.span.clone(),
+                            None => stmt.span.clone()
+                        };
                         flow.push_back(Node {
-                            span: stmt.span.clone(),
+                            span,
                             instruction: Instruction::JumpIfZero(
                                 (then_flow.len() + 1) as i32)
                         });
@@ -408,11 +428,11 @@ impl Convert {
                                                  type_table,
                                                  return_type)?;
                 flow.push_front(Node {
-                    span: stmt.span.clone(),
+                    span: Span::new(stmt.span.lo, stmt.span.lo + 1),
                     instruction: Instruction::ScopeBegin
                 });
                 flow.push_back(Node {
-                    span: stmt.span.clone(),
+                    span: Span::new(stmt.span.hi, stmt.span.hi + 1),
                     instruction: Instruction::ScopeEnd
                 });
                 Ok(flow)
@@ -431,7 +451,7 @@ impl Convert {
                     cond_flow.len() as i32
                     + body_flow.len() as i32);
                 body_flow.push_back(Node {
-                    span: body.span.clone(),
+                    span: Span::new(body.span.hi, body.span.hi + 1),
                     instruction: Instruction::Jump(body_offset)
                 });
                 cond_flow.append(&mut body_flow);
@@ -490,12 +510,16 @@ impl Convert {
                     + inc_flow.len() as i32
                     + body_flow.len() as i32);
                 body_flow.push_back(Node {
-                    span: stmt.span.clone(),
+                    span: Span::new(body.span.hi, body.span.hi + 1),
                     instruction: Instruction::Jump(body_offset)
                 });
                 init_flow.append(&mut inc_flow);
                 init_flow.append(&mut check_flow);
                 init_flow.append(&mut body_flow);
+                init_flow.push_back(Node {
+                    span: Span::new(body.span.hi + 1, body.span.hi + 2),
+                    instruction: Instruction::Nothing
+                });
 
                 Ok(init_flow)
 

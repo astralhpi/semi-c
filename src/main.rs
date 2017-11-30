@@ -244,12 +244,16 @@ impl Command {
         } else if sp.len() > 2 {
             err
         } else {
-            match sp[1].parse() {
-                Ok(i) => {
-                    Ok(Command::Next(i))
-                },
-                Err(e) =>  {
-                    err
+            if sp[1] == "" {
+                Ok(Command::Next(1))
+            } else {
+                match sp[1].parse() {
+                    Ok(i) => {
+                        Ok(Command::Next(i))
+                    },
+                    Err(e) =>  {
+                        err
+                    }
                 }
             }
         }

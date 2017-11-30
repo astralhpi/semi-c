@@ -7,6 +7,7 @@ use error::Error;
 use register::Register;
 use memory::Memory;
 use printf::Printf;
+use std::cmp;
 
 pub type History = Vec<(usize, Option<String>)>;
 type VarTable = SymbolTable<String, (usize, History)>;
@@ -103,6 +104,7 @@ impl Runtime {
 
     pub fn step_line(&mut self, line: u32) -> Result<ProgramState, Error> {
         let mut line = line;
+        let mut max_line = 0;
         while line > 0 {
             if self.program_stack.len() == 0 {
                 assert_eq!(self.register_stack.len(), 1);
@@ -110,13 +112,18 @@ impl Runtime {
             }
 
             let mut node_line = self.line_of_cur_node() as u32;
+            max_line = cmp::max(node_line, max_line);
 
-            if self.will_line_jump() {
-                line -= 1;
-                self.step()?;
-                self.line_pointer = self.line_of_cur_node() as u32;
-            } else if self.line_pointer + line > node_line {
-                self.step()?;
+            if self.line_pointer + line > max_line {
+                if self.will_line_jump() {
+                    line -= max_line - self.line_pointer + 1;
+                    self.step()?;
+                    self.line_pointer = self.line_of_cur_node() as u32;
+                    max_line = 0;
+
+                } else {
+                    self.step()?;
+                }
             } else {
                 break;
             }
@@ -192,12 +199,12 @@ impl Runtime {
 
     fn will_line_jump(&self) -> bool {
         let &(ref func_name, index) = self.lookup_program_pointer();
-        let n = self.get_node(func_name, index).unwrap();
+        let n = self.get_node(func_name, index).expect("no node");
         let line = self.meta.line(n.span.lo);
 
         match &n.instruction {
             &Instruction::Jump(offset) => {
-                let i = index + offset as usize;
+                let i = (index as i32 + offset) as usize;
                 let target = self.get_node(func_name, i).unwrap();
                 let target_line = self.meta.line(target.span.lo);
                 line != target_line
@@ -206,7 +213,7 @@ impl Runtime {
                 let r = self.lookup_register();
                 unsafe {
                     if r.int == 0 {
-                        let i = index + offset as usize;
+                        let i = (index as i32 + offset) as usize;
                         let target = self.get_node(func_name, i).unwrap();
                         let target_line = self.meta.line(target.span.lo);
                         line != target_line
@@ -221,6 +228,18 @@ impl Runtime {
                 let func = &self.flow_table[name];
                 let func_line = self.meta.line(func.span.lo);
                 func_line != line
+            },
+            &Instruction::ReturnVoid | &Instruction::Return => {
+                if self.program_stack.len() < 2 {
+                    false
+                } else {
+                    let idx = self.program_stack.len() - 2;
+                    let &(ref func_name, idx) = &self.program_stack[idx];
+                    let n = self.get_node(func_name, idx).unwrap();
+                    line != self.meta.line(n.span.lo)
+
+                }
+
             }
             _ => false
         }
@@ -240,6 +259,9 @@ impl Runtime {
         match node {
             &Some(ref n) => {
                 match &n.instruction {
+                    &Instruction::Nothing => {
+                        self.program_stack.push((func_name, index+1));
+                    }
                     &Instruction::LoadString(ref s) => {
                         let mut bytes = s.clone().into_bytes();
                         bytes.push(0);
@@ -313,14 +335,18 @@ impl Runtime {
                     },
                     &Instruction::Return => {
                         self.memory.drop_scope();
-                        self.var_table.drop_scope();
-                        self.var_table.drop_scope();
+                        if self.var_table.depth() != 2 {
+                            self.var_table.drop_scope();
+                            self.var_table.drop_scope();
+                        }
                     },
                     &Instruction::ReturnVoid => {
                         self.register_stack.push(Register {int: 0});
                         self.memory.drop_scope();
-                        self.var_table.drop_scope();
-                        self.var_table.drop_scope();
+                        if self.var_table.depth() != 2 {
+                            self.var_table.drop_scope();
+                            self.var_table.drop_scope();
+                        }
                     },
                     &Instruction::Printf { ref args_size } => {
                         let len = self.register_stack.len();
